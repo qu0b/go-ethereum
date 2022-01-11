@@ -176,6 +176,7 @@ func (api *ConsensusAPI) makeEnv(parent *types.Block, header *types.Header) (*bl
 }
 
 func (api *ConsensusAPI) GetPayloadV1(payloadID hexutil.Bytes) (*ExecutableDataV1, error) {
+	log.Trace("GetPayload", "payloadID", payloadID)
 	hash := []byte(payloadID)
 	if len(hash) < 8 {
 		return nil, &InvalidPayloadID
@@ -189,6 +190,7 @@ func (api *ConsensusAPI) GetPayloadV1(payloadID hexutil.Bytes) (*ExecutableDataV
 }
 
 func (api *ConsensusAPI) ForkchoiceUpdatedV1(heads ForkchoiceStateV1, PayloadAttributes *PayloadAttributesV1) (ForkChoiceResponse, error) {
+	log.Trace("ForkChoiceUpdatedV1", "head", heads.HeadBlockHash, "finalBH", heads.FinalizedBlockHash, "safeBH", heads.SafeBlockHash)
 	if heads.HeadBlockHash == (common.Hash{}) {
 		return ForkChoiceResponse{Status: SUCCESS.Status, PayloadID: nil}, nil
 	}
@@ -246,6 +248,7 @@ func (api *ConsensusAPI) invalid() ExecutePayloadResponse {
 
 // ExecutePayload creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
 func (api *ConsensusAPI) ExecutePayloadV1(params ExecutableDataV1) (ExecutePayloadResponse, error) {
+	log.Trace("ExecutePayloadV1", "hash", params.BlockHash, "number", params.Number)
 	block, err := ExecutableDataToBlock(params)
 	if err != nil {
 		return api.invalid(), err
@@ -265,13 +268,10 @@ func (api *ConsensusAPI) ExecutePayloadV1(params ExecutableDataV1) (ExecutePaylo
 		return ExecutePayloadResponse{Status: VALID.Status, LatestValidHash: block.Hash()}, nil
 	}
 	if !api.eth.BlockChain().HasBlock(block.ParentHash(), block.NumberU64()-1) {
-
-		//TODO (MariusVanDerWijden) reenable once sync is merged
+		// We don't have the parent in db, so we need to query the network for it
 		if err := api.eth.Downloader().BeaconSync(api.eth.SyncMode(), block.Header()); err != nil {
 			return ExecutePayloadResponse{Status: SYNCING.Status, LatestValidHash: common.Hash{}}, err
 		}
-
-		// TODO (MariusVanDerWijden) we should return nil here not empty hash
 		return ExecutePayloadResponse{Status: SYNCING.Status, LatestValidHash: common.Hash{}}, nil
 	}
 	parent := api.eth.BlockChain().GetBlockByHash(params.ParentHash)
@@ -280,6 +280,7 @@ func (api *ConsensusAPI) ExecutePayloadV1(params ExecutableDataV1) (ExecutePaylo
 	if td.Cmp(ttd) < 0 {
 		return api.invalid(), fmt.Errorf("can not execute payload on top of block with low td got: %v threshold %v", td, ttd)
 	}
+	log.Trace("InsertingBlockWithoutSetHead", "hash", block.Hash(), "number", block.Number)
 	if err := api.eth.BlockChain().InsertBlockWithoutSetHead(block); err != nil {
 		return api.invalid(), err
 	}
