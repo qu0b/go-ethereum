@@ -231,10 +231,12 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, genesis *Genesis, override
 	if height == nil {
 		return newcfg, stored, fmt.Errorf("missing block number for head header hash")
 	}
-	compatErr := storedcfg.CheckCompatible(newcfg, *height)
-	if compatErr != nil && *height != 0 && compatErr.RewindTo != 0 {
-		return newcfg, stored, compatErr
-	}
+	/*
+		compatErr := storedcfg.CheckCompatible(newcfg, *height)
+		if compatErr != nil && *height != 0 && compatErr.RewindTo != 0 {
+			return newcfg, stored, compatErr
+		}
+	*/
 	rawdb.WriteChainConfig(db, stored, newcfg)
 	return newcfg, stored, nil
 }
