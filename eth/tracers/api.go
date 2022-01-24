@@ -432,8 +432,19 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 
 // TraceBlockByNumber returns the structured logs created during the execution of
 // EVM and returns them as a JSON object.
-func (api *API) TraceBlockByNumber(ctx context.Context, number rpc.BlockNumber, config *TraceConfig) ([]*txTraceResult, error) {
-	block, err := api.blockByNumber(ctx, number)
+func (api *API) TraceBlockByNumber(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) ([]*txTraceResult, error) {
+	// Try to retrieve the specified block
+	var (
+		err   error
+		block *types.Block
+	)
+	if hash, ok := blockNrOrHash.Hash(); ok {
+		block, err = api.blockByHash(ctx, hash)
+	} else if number, ok := blockNrOrHash.Number(); ok {
+		block, err = api.blockByNumber(ctx, number)
+	} else {
+		return nil, errors.New("invalid arguments; neither block nor hash specified")
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -392,7 +392,7 @@ func TestTraceBlock(t *testing.T) {
 		},
 	}
 	for i, tc := range testSuite {
-		result, err := api.TraceBlockByNumber(context.Background(), tc.blockNumber, tc.config)
+		result, err := api.TraceBlockByNumber(context.Background(), rpc.BlockNumberOrHashWithNumber(tc.blockNumber), tc.config)
 		if tc.expectErr != nil {
 			if err == nil {
 				t.Errorf("test %d, want error %v", i, tc.expectErr)
