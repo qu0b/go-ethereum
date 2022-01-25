@@ -47,7 +47,7 @@ type ExecutableDataV1 struct {
 	ParentHash    common.Hash    `json:"parentHash"    gencodec:"required"`
 	FeeRecipient  common.Address `json:"feeRecipient"  gencodec:"required"`
 	StateRoot     common.Hash    `json:"stateRoot"     gencodec:"required"`
-	ReceiptsRoot  common.Hash    `json:"receiptsRoot"   gencodec:"required"`
+	ReceiptsRoot  common.Hash    `json:"receiptsRoot"  gencodec:"required"`
 	LogsBloom     []byte         `json:"logsBloom"     gencodec:"required"`
 	Random        common.Hash    `json:"random"        gencodec:"required"`
 	Number        uint64         `json:"blockNumber"   gencodec:"required"`
@@ -84,9 +84,10 @@ type GenericStringResponse struct {
 	Status string `json:"status"`
 }
 
-type ExecutePayloadResponse struct {
+type PayloadStatusV1 struct {
 	Status          string      `json:"status"`
 	LatestValidHash common.Hash `json:"latestValidHash"`
+	ValidationError string      `json:"validationError"`
 }
 
 type ConsensusValidatedParams struct {
@@ -114,8 +115,8 @@ func (b *PayloadID) UnmarshalText(input []byte) error {
 }
 
 type ForkChoiceResponse struct {
-	Status    string     `json:"status"`
-	PayloadID *PayloadID `json:"payloadId"`
+	PayloadStatus PayloadStatusV1 `json:"payloadStatus"`
+	PayloadID     *PayloadID      `json:"payloadId"`
 }
 
 type ForkchoiceStateV1 struct {
