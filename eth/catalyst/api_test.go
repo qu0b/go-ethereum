@@ -49,11 +49,12 @@ func generatePreMergeChain(n int) (*core.Genesis, []*types.Block) {
 	db := rawdb.NewMemoryDatabase()
 	config := params.AllEthashProtocolChanges
 	genesis := &core.Genesis{
-		Config:    config,
-		Alloc:     core.GenesisAlloc{testAddr: {Balance: testBalance}},
-		ExtraData: []byte("test genesis"),
-		Timestamp: 9000,
-		BaseFee:   big.NewInt(params.InitialBaseFee),
+		Config:     config,
+		Alloc:      core.GenesisAlloc{testAddr: {Balance: testBalance}},
+		ExtraData:  []byte("test genesis"),
+		Timestamp:  9000,
+		BaseFee:    big.NewInt(params.InitialBaseFee),
+		Difficulty: big.NewInt(0),
 	}
 	testNonce := uint64(0)
 	generate := func(i int, g *core.BlockGen) {
@@ -130,8 +131,10 @@ func TestSetHeadBeforeTotalDifficulty(t *testing.T) {
 		SafeBlockHash:      common.Hash{},
 		FinalizedBlockHash: common.Hash{},
 	}
-	if _, err := api.ForkchoiceUpdatedV1(fcState, nil); err == nil {
-		t.Errorf("fork choice updated before total terminal difficulty should fail")
+	if resp, err := api.ForkchoiceUpdatedV1(fcState, nil); err != nil {
+		t.Errorf("fork choice updated should not error: %v", err)
+	} else if resp.PayloadStatus.Status != beacon.INVALIDTERMINALBLOCK {
+		t.Errorf("fork choice updated before total terminal difficulty should be INVALID")
 	}
 }
 
@@ -271,7 +274,7 @@ func TestEth2NewBlock(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to convert executable data to block %v", err)
 		}
-		newResp, err := api.ExecutePayloadV1(*execData)
+		newResp, err := api.NewPayloadV1(*execData)
 		if err != nil || newResp.Status != "VALID" {
 			t.Fatalf("Failed to insert block: %v", err)
 		}
@@ -311,7 +314,7 @@ func TestEth2NewBlock(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to convert executable data to block %v", err)
 		}
-		newResp, err := api.ExecutePayloadV1(*execData)
+		newResp, err := api.NewPayloadV1(*execData)
 		if err != nil || newResp.Status != "VALID" {
 			t.Fatalf("Failed to insert block: %v", err)
 		}
@@ -438,15 +441,14 @@ func TestFullAPI(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error preparing payload, err=%v", err)
 		}
-		if resp.Status != beacon.VALID {
-			t.Fatalf("error preparing payload, invalid status: %v", resp.Status)
+		if resp.PayloadStatus.Status != beacon.VALID {
+			t.Fatalf("error preparing payload, invalid status: %v", resp.PayloadStatus.Status)
 		}
-		payloadID := computePayloadId(parent.Hash(), &params)
-		payload, err := api.GetPayloadV1(payloadID)
+		payload, err := api.GetPayloadV1(*resp.PayloadID)
 		if err != nil {
 			t.Fatalf("can't get payload: %v", err)
 		}
-		execResp, err := api.ExecutePayloadV1(*payload)
+		execResp, err := api.NewPayloadV1(*payload)
 		if err != nil {
 			t.Fatalf("can't execute payload: %v", err)
 		}
