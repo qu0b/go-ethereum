@@ -19,10 +19,14 @@ package beacon
 import "github.com/ethereum/go-ethereum/rpc"
 
 var (
-	VALID              = GenericStringResponse{"VALID"}
-	SUCCESS            = GenericStringResponse{"SUCCESS"}
-	INVALID            = ForkChoiceResponse{Status: "INVALID", PayloadID: nil}
-	SYNCING            = ForkChoiceResponse{Status: "SYNCING", PayloadID: nil}
+	VALID              = "VALID"
+	INVALIDBLOCKHASH   = "INVALID_BLOCK_HASH"
+	ACCEPTED           = "ACCEPTED"
+	INVALID            = "INVALID"
+	SYNCING            = "SYNCING"
+	STATUS_SUCCESS     = ForkChoiceResponse{PayloadStatus: PayloadStatusV1{Status: VALID}, PayloadID: nil}
+	STATUS_INVALID     = ForkChoiceResponse{PayloadStatus: PayloadStatusV1{Status: INVALID}, PayloadID: nil}
+	STATUS_SYNCING     = ForkChoiceResponse{PayloadStatus: PayloadStatusV1{Status: SYNCING}, PayloadID: nil}
 	GenericServerError = rpc.CustomError{Code: -32000, ValidationError: "Server error"}
 	UnknownPayload     = rpc.CustomError{Code: -32001, ValidationError: "Unknown payload"}
 	InvalidTB          = rpc.CustomError{Code: -32002, ValidationError: "Invalid terminal block"}
