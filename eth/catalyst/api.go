@@ -91,6 +91,10 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(heads beacon.ForkchoiceStateV1, pay
 			return beacon.STATUS_SYNCING, nil
 		}
 	}
+	if block := api.eth.BlockChain().GetBlockByHash(heads.HeadBlockHash); block == nil {
+		// TODO (MariusVanDerWijden) trigger sync
+		return beacon.STATUS_SYNCING, nil
+	}
 	// SetHead
 	if err := api.setHead(heads.HeadBlockHash); err != nil {
 		return beacon.ForkChoiceResponse{PayloadStatus: api.invalid(err)}, nil
