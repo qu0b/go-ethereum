@@ -111,7 +111,7 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(heads beacon.ForkchoiceStateV1, pay
 		id := computePayloadId(heads.HeadBlockHash, payloadAttributes)
 		api.preparedBlocks.put(id, data)
 		log.Info("Created payload", "payloadID", id)
-		return beacon.ForkChoiceResponse{PayloadStatus: beacon.PayloadStatusV1{Status: beacon.SUCCESS}, PayloadID: &id}, nil
+		return beacon.ForkChoiceResponse{PayloadStatus: beacon.PayloadStatusV1{Status: beacon.VALID}, PayloadID: &id}, nil
 	}
 	return beacon.STATUS_SUCCESS, nil
 }
