@@ -20,12 +20,11 @@ import "github.com/ethereum/go-ethereum/rpc"
 
 var (
 	VALID              = "VALID"
-	SUCCESS            = "SUCCESS"
 	INVALIDBLOCKHASH   = "INVALID_BLOCK_HASH"
 	ACCEPTED           = "ACCEPTED"
 	INVALID            = "INVALID"
 	SYNCING            = "SYNCING"
-	STATUS_SUCCESS     = ForkChoiceResponse{PayloadStatus: PayloadStatusV1{Status: SUCCESS}, PayloadID: nil}
+	STATUS_SUCCESS     = ForkChoiceResponse{PayloadStatus: PayloadStatusV1{Status: VALID}, PayloadID: nil}
 	STATUS_INVALID     = ForkChoiceResponse{PayloadStatus: PayloadStatusV1{Status: INVALID}, PayloadID: nil}
 	STATUS_SYNCING     = ForkChoiceResponse{PayloadStatus: PayloadStatusV1{Status: SYNCING}, PayloadID: nil}
 	GenericServerError = rpc.CustomError{Code: -32000, ValidationError: "Server error"}
