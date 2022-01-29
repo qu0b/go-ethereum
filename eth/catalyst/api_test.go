@@ -440,7 +440,7 @@ func TestFullAPI(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error preparing payload, err=%v", err)
 		}
-		if resp.PayloadStatus.Status != beacon.SUCCESS {
+		if resp.PayloadStatus.Status != beacon.VALID {
 			t.Fatalf("error preparing payload, invalid status: %v", resp.PayloadStatus.Status)
 		}
 		payloadID := computePayloadId(parent.Hash(), &params)
