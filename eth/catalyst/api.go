@@ -29,7 +29,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/hashicorp/golang-lru/simplelru"
 )
+
+const headerCacheSize = 1024
 
 // Register adds catalyst APIs to the full node.
 func Register(stack *node.Node, backend *eth.Ethereum) error {
@@ -48,6 +51,7 @@ func Register(stack *node.Node, backend *eth.Ethereum) error {
 type ConsensusAPI struct {
 	eth            *eth.Ethereum
 	preparedBlocks *payloadQueue // preparedBlocks caches payloads (*ExecutableDataV1) by payload ID (PayloadID)
+	headerCache    *simplelru.LRU
 }
 
 // NewConsensusAPI creates a new consensus api for the given backend.
@@ -56,9 +60,14 @@ func NewConsensusAPI(eth *eth.Ethereum) *ConsensusAPI {
 	if eth.BlockChain().Config().TerminalTotalDifficulty == nil {
 		panic("Catalyst started without valid total difficulty")
 	}
+	// Setup cache
+	cache, _ := simplelru.NewLRU(headerCacheSize, func(key, value interface{}) {
+		log.Trace("Evicted header from catalyst cache", "hash", key)
+	})
 	return &ConsensusAPI{
 		eth:            eth,
 		preparedBlocks: newPayloadQueue(),
+		headerCache:    cache,
 	}
 }
 
@@ -92,7 +101,13 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(heads beacon.ForkchoiceStateV1, pay
 		}
 	}
 	if block := api.eth.BlockChain().GetBlockByHash(heads.HeadBlockHash); block == nil {
-		if err := api.eth.Downloader().BeaconSync(api.eth.SyncMode(), block.Header()); err != nil {
+		// block not in bc, try cache
+		header, ok := api.headerCache.Get(heads.HeadBlockHash)
+		if !ok {
+			log.Warn("Could not find head in cache, need a new_payload with it before fcu")
+			return beacon.STATUS_SYNCING, nil
+		}
+		if err := api.eth.Downloader().BeaconSync(api.eth.SyncMode(), header.(*types.Header)); err != nil {
 			return beacon.STATUS_SYNCING, err
 		}
 		// TODO (MariusVanDerWijden) trigger sync
@@ -133,6 +148,9 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 	if err != nil {
 		return beacon.PayloadStatusV1{Status: beacon.INVALIDBLOCKHASH}, nil
 	}
+	// block is a valid block, store in cache for later use
+	api.headerCache.Add(block.Hash(), block.Header())
+
 	if !api.eth.BlockChain().HasBlock(block.ParentHash(), block.NumberU64()-1) {
 		/*
 			TODO (MariusVanDerWijden) maybe reenable once sync is merged
