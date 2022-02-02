@@ -73,14 +73,9 @@ type executableDataMarshaling struct {
 }
 
 type PayloadStatusV1 struct {
-	Status          string      `json:"status"`
-	LatestValidHash common.Hash `json:"latestValidHash"`
-	ValidationError string      `json:"validationError"`
-}
-
-type ConsensusValidatedParams struct {
-	BlockHash common.Hash `json:"blockHash"`
-	Status    string      `json:"status"`
+	Status          string       `json:"status"`
+	LatestValidHash *common.Hash `json:"latestValidHash"`
+	ValidationError *string      `json:"validationError"`
 }
 
 // PayloadID is an identifier of the payload build process

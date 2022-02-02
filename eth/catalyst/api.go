@@ -233,7 +233,8 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 		merger.ReachTTD()
 		api.eth.Downloader().Cancel()
 	}
-	return beacon.PayloadStatusV1{Status: beacon.VALID, LatestValidHash: block.Hash()}, nil
+	hash := block.Hash()
+	return beacon.PayloadStatusV1{Status: beacon.VALID, LatestValidHash: &hash}, nil
 }
 
 // computePayloadId computes a pseudo-random payloadid, based on the parameters.
@@ -251,7 +252,9 @@ func computePayloadId(headBlockHash common.Hash, params *beacon.PayloadAttribute
 
 // invalid returns a response "INVALID" with the latest valid hash set to the current head.
 func (api *ConsensusAPI) invalid(err error) beacon.PayloadStatusV1 {
-	return beacon.PayloadStatusV1{Status: beacon.INVALID, LatestValidHash: api.eth.BlockChain().CurrentHeader().Hash(), ValidationError: err.Error()}
+	currentHash := api.eth.BlockChain().CurrentHeader().Hash()
+	errorMsg := err.Error()
+	return beacon.PayloadStatusV1{Status: beacon.INVALID, LatestValidHash: &currentHash, ValidationError: &errorMsg}
 }
 
 // assembleBlock creates a new block and returns the "execution

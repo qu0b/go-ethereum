@@ -114,7 +114,7 @@ func (api *ConsensusAPI) ExecutePayloadV1(params beacon.ExecutableDataV1) (beaco
 			}
 		*/
 		// TODO (MariusVanDerWijden) we should return nil here not empty hash
-		return beacon.PayloadStatusV1{Status: beacon.SYNCING, LatestValidHash: common.Hash{}}, nil
+		return beacon.PayloadStatusV1{Status: beacon.SYNCING, LatestValidHash: nil}, nil
 	}
 	parent := api.les.BlockChain().GetHeaderByHash(params.ParentHash)
 	if parent == nil {
@@ -131,12 +131,14 @@ func (api *ConsensusAPI) ExecutePayloadV1(params beacon.ExecutableDataV1) (beaco
 	if merger := api.les.Merger(); !merger.TDDReached() {
 		merger.ReachTTD()
 	}
-	return beacon.PayloadStatusV1{Status: beacon.VALID, LatestValidHash: block.Hash()}, nil
+	hash := block.Hash()
+	return beacon.PayloadStatusV1{Status: beacon.VALID, LatestValidHash: &hash}, nil
 }
 
 // invalid returns a response "INVALID" with the latest valid hash set to the current head.
 func (api *ConsensusAPI) invalid() beacon.PayloadStatusV1 {
-	return beacon.PayloadStatusV1{Status: beacon.INVALID, LatestValidHash: api.les.BlockChain().CurrentHeader().Hash()}
+	currentHash := api.les.BlockChain().CurrentHeader().Hash()
+	return beacon.PayloadStatusV1{Status: beacon.INVALID, LatestValidHash: &currentHash}
 }
 
 func (api *ConsensusAPI) checkTerminalTotalDifficulty(head common.Hash) error {
