@@ -184,7 +184,8 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 	// return a fake success.
 	if block := api.eth.BlockChain().GetBlockByHash(params.BlockHash); block != nil {
 		log.Warn("Ignoring already known beacon payload", "number", params.Number, "hash", params.BlockHash, "age", common.PrettyAge(time.Unix(int64(block.Time()), 0)))
-		return beacon.PayloadStatusV1{Status: beacon.VALID, LatestValidHash: block.Hash()}, nil
+		hash := block.Hash()
+		return beacon.PayloadStatusV1{Status: beacon.VALID, LatestValidHash: &hash}, nil
 	}
 	// If the parent is missing, we - in theory - could trigger a sync, but that
 	// would also entail a reorg. That is problematic if multiple sibling blocks
@@ -203,14 +204,15 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 		// some strain from the forkchoice update.
 		if err := api.eth.Downloader().BeaconExtend(api.eth.SyncMode(), block.Header()); err == nil {
 			log.Debug("Payload accepted for sync extension", "number", params.Number, "hash", params.BlockHash)
-			return beacon.PayloadStatusV1{Status: beacon.SYNCING, LatestValidHash: api.eth.BlockChain().CurrentBlock().Hash()}, nil
+			currentHash := api.eth.BlockChain().CurrentBlock().Hash()
+			return beacon.PayloadStatusV1{Status: beacon.SYNCING, LatestValidHash: &currentHash}, nil
 		}
 		// Either no beacon sync was started yet, or it rejected the delivered
 		// payload as non-integratable on top of the existing sync. We'll just
 		// have to rely on the beacon client to forcefully update the head with
 		// a forkchoice update request.
 		log.Warn("Ignoring payload with missing parent", "number", params.Number, "hash", params.BlockHash, "parent", params.ParentHash)
-		return beacon.PayloadStatusV1{Status: beacon.SYNCING, LatestValidHash: common.Hash{}}, nil // TODO(karalabe): Switch to ACCEPTED
+		return beacon.PayloadStatusV1{Status: beacon.SYNCING, LatestValidHash: nil}, nil // TODO(karalabe): Switch to ACCEPTED
 	}
 	// We have an existing parent, do some sanity checks to avoid the beacon client
 	// triggering too early
@@ -272,23 +274,6 @@ func (api *ConsensusAPI) assembleBlock(parentHash common.Hash, params *beacon.Pa
 func (api *ConsensusAPI) insertTransactions(txs types.Transactions) error {
 	for _, tx := range txs {
 		api.eth.TxPool().AddLocal(tx)
-	}
-	return nil
-}
-
-func (api *ConsensusAPI) checkTerminalTotalDifficulty(head common.Hash) error {
-	// shortcut if we entered PoS already
-	if api.eth.Merger().PoSFinalized() {
-		return nil
-	}
-	// make sure the parent has enough terminal total difficulty
-	newHeadBlock := api.eth.BlockChain().GetBlockByHash(head)
-	if newHeadBlock == nil {
-		return &beacon.GenericServerError
-	}
-	td := api.eth.BlockChain().GetTd(newHeadBlock.Hash(), newHeadBlock.NumberU64())
-	if td != nil && td.Cmp(api.eth.BlockChain().Config().TerminalTotalDifficulty) < 0 {
-		return &beacon.InvalidTB
 	}
 	return nil
 }
