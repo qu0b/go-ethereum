@@ -145,11 +145,11 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 		finalBlock := api.eth.BlockChain().GetBlockByHash(update.FinalizedBlockHash)
 		if finalBlock == nil {
 			log.Warn("Final block not available in database")
-			return beacon.STATUS_INVALID, nil
+			return beacon.STATUS_INVALID, errors.New("invalid final block")
 		}
 		if rawdb.ReadCanonicalHash(api.eth.ChainDb(), finalBlock.NumberU64()) != update.FinalizedBlockHash {
 			log.Warn("Final block not in canonical chain")
-			return beacon.STATUS_INVALID, nil
+			return beacon.STATUS_INVALID, errors.New("final block not canonical")
 		}
 	}
 	// TODO (MariusVanDerWijden): Check if the safe block hash is in our canonical tree, if not somethings wrong
@@ -157,11 +157,11 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 		safeBlock := api.eth.BlockChain().GetBlockByHash(update.SafeBlockHash)
 		if safeBlock == nil {
 			log.Warn("Safe block not available in database")
-			return beacon.STATUS_INVALID, nil
+			return beacon.STATUS_INVALID, errors.New("invalid safe block")
 		}
 		if rawdb.ReadCanonicalHash(api.eth.ChainDb(), safeBlock.NumberU64()) != update.SafeBlockHash {
 			log.Warn("Safe block not in canonical chain")
-			return beacon.STATUS_INVALID, nil
+			return beacon.STATUS_INVALID, errors.New("safe block not canonical")
 		}
 	}
 	// If payload generation was requested, create a new block to be potentially
