@@ -129,6 +129,14 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 	// If the head block is already in our canonical chain, the beacon client is
 	// probably resyncing. Ignore the update.
 	if rawdb.ReadCanonicalHash(api.eth.ChainDb(), block.NumberU64()) == update.HeadBlockHash {
+		if block.NumberU64() < api.eth.BlockChain().CurrentBlock().NumberU64() {
+			// TODO (MariusVanDerWijden) should this be possible?
+			// If we allow these types of reorgs, we will do lots and lots of reorgs during sync
+			log.Warn("Reorg to previous block")
+			if err := api.eth.BlockChain().SetChainHead(block); err != nil {
+				return beacon.STATUS_INVALID, err
+			}
+		}
 		log.Warn("Ignoring beacon update to old head", "number", block.NumberU64(), "hash", update.HeadBlockHash, "age", common.PrettyAge(time.Unix(int64(block.Time()), 0)), "have", api.eth.BlockChain().CurrentBlock().NumberU64())
 	} else if err := api.eth.BlockChain().SetChainHead(block); err != nil {
 		return beacon.STATUS_INVALID, err
