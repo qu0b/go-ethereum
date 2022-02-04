@@ -94,7 +94,7 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 		header := api.remoteBlocks.get(update.HeadBlockHash)
 		if header == nil {
 			log.Warn("Forkcoice requested unknown head", "hash", update.HeadBlockHash)
-			return beacon.STATUS_INVALID, errors.New("head hash never advertised")
+			return beacon.STATUS_SYNCING, nil
 		}
 		// Header advertised via a past newPayload request. Start syncing to it.
 		// Before we do however, make sure any legacy sync in switched off so we
@@ -141,7 +141,10 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 		if merger := api.eth.Merger(); !merger.PoSFinalized() {
 			merger.FinalizePoS()
 		}
+		// TODO (MariusVanDerWijden): If the finalized block is not in our canonical tree, somethings wrong
 	}
+
+	// TODO (MariusVanDerWijden): Check if the safe block hash is in our canonical tree, if not somethings wrong
 	// If payload generation was requested, create a new block to be potentially
 	// sealed by the beacon client. The payload will be requested later, and we
 	// might replace it arbitrarilly many times in between.
@@ -212,7 +215,7 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 		// have to rely on the beacon client to forcefully update the head with
 		// a forkchoice update request.
 		log.Warn("Ignoring payload with missing parent", "number", params.Number, "hash", params.BlockHash, "parent", params.ParentHash)
-		return beacon.PayloadStatusV1{Status: beacon.SYNCING, LatestValidHash: nil}, nil // TODO(karalabe): Switch to ACCEPTED
+		return beacon.PayloadStatusV1{Status: beacon.ACCEPTED, LatestValidHash: nil}, nil
 	}
 	// We have an existing parent, do some sanity checks to avoid the beacon client
 	// triggering too early
@@ -222,7 +225,7 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 	)
 	if td.Cmp(ttd) < 0 {
 		log.Warn("Ignoring pre-merge payload", "number", params.Number, "hash", params.BlockHash, "td", td, "ttd", ttd)
-		return api.invalid(err), nil
+		return api.invalid(errors.New("invalid terminal block hash")), nil
 	}
 	log.Trace("Inserting block without sethead", "hash", block.Hash(), "number", block.Number)
 	if err := api.eth.BlockChain().InsertBlockWithoutSetHead(block); err != nil {
