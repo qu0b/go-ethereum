@@ -110,7 +110,7 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 		return beacon.STATUS_SYNCING, nil
 	}
 	// Block is known locally, just sanity check that the beacon client does not
-	// attempt to push as back to before the merge.
+	// attempt to push us back to before the merge.
 	if block.Difficulty().BitLen() > 0 {
 		var (
 			td  = api.eth.BlockChain().GetTd(update.HeadBlockHash, block.NumberU64())
@@ -142,9 +142,28 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 			merger.FinalizePoS()
 		}
 		// TODO (MariusVanDerWijden): If the finalized block is not in our canonical tree, somethings wrong
+		finalBlock := api.eth.BlockChain().GetBlockByHash(update.FinalizedBlockHash)
+		if finalBlock == nil {
+			log.Warn("Final block not available in database")
+			return beacon.STATUS_INVALID, nil
+		}
+		if rawdb.ReadCanonicalHash(api.eth.ChainDb(), finalBlock.NumberU64()) != update.FinalizedBlockHash {
+			log.Warn("Final block not in canonical chain")
+			return beacon.STATUS_INVALID, nil
+		}
 	}
-
 	// TODO (MariusVanDerWijden): Check if the safe block hash is in our canonical tree, if not somethings wrong
+	if update.SafeBlockHash != (common.Hash{}) {
+		safeBlock := api.eth.BlockChain().GetBlockByHash(update.SafeBlockHash)
+		if safeBlock == nil {
+			log.Warn("Safe block not available in database")
+			return beacon.STATUS_INVALID, nil
+		}
+		if rawdb.ReadCanonicalHash(api.eth.ChainDb(), safeBlock.NumberU64()) != update.SafeBlockHash {
+			log.Warn("Safe block not in canonical chain")
+			return beacon.STATUS_INVALID, nil
+		}
+	}
 	// If payload generation was requested, create a new block to be potentially
 	// sealed by the beacon client. The payload will be requested later, and we
 	// might replace it arbitrarilly many times in between.
@@ -225,7 +244,7 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 	)
 	if td.Cmp(ttd) < 0 {
 		log.Warn("Ignoring pre-merge payload", "number", params.Number, "hash", params.BlockHash, "td", td, "ttd", ttd)
-		return api.invalid(errors.New("invalid terminal block hash")), nil
+		return beacon.PayloadStatusV1{Status: beacon.INVALIDBLOCKHASH}, nil
 	}
 	log.Trace("Inserting block without sethead", "hash", block.Hash(), "number", block.Number)
 	if err := api.eth.BlockChain().InsertBlockWithoutSetHead(block); err != nil {
