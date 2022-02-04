@@ -111,7 +111,7 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 	}
 	// Block is known locally, just sanity check that the beacon client does not
 	// attempt to push us back to before the merge.
-	if block.Difficulty().BitLen() > 0 {
+	if block.Difficulty().BitLen() > 0 || block.NumberU64() == 0 {
 		var (
 			td  = api.eth.BlockChain().GetTd(update.HeadBlockHash, block.NumberU64())
 			ptd = api.eth.BlockChain().GetTd(block.ParentHash(), block.NumberU64()-1)
