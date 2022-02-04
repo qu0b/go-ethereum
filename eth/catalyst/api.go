@@ -145,10 +145,10 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 		finalBlock := api.eth.BlockChain().GetBlockByHash(update.FinalizedBlockHash)
 		if finalBlock == nil {
 			log.Warn("Final block not available in database", "hash", update.FinalizedBlockHash)
-			return beacon.STATUS_SYNCING, nil
+			return beacon.ForkChoiceResponse{PayloadStatus: api.invalid(errors.New("final block not available")), PayloadID: nil}, nil
 		} else if rawdb.ReadCanonicalHash(api.eth.ChainDb(), finalBlock.NumberU64()) != update.FinalizedBlockHash {
 			log.Warn("Final block not in canonical chain", "number", block.NumberU64(), "hash", update.HeadBlockHash)
-			return beacon.STATUS_INVALID, errors.New("final block not canonical")
+			return beacon.ForkChoiceResponse{PayloadStatus: api.invalid(errors.New("final block not canonical")), PayloadID: nil}, nil
 		}
 	}
 	// TODO (MariusVanDerWijden): Check if the safe block hash is in our canonical tree, if not somethings wrong
@@ -156,11 +156,11 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 		safeBlock := api.eth.BlockChain().GetBlockByHash(update.SafeBlockHash)
 		if safeBlock == nil {
 			log.Warn("Safe block not available in database")
-			return beacon.STATUS_SYNCING, nil
+			return beacon.ForkChoiceResponse{PayloadStatus: api.invalid(errors.New("safe head not available")), PayloadID: nil}, nil
 		}
 		if rawdb.ReadCanonicalHash(api.eth.ChainDb(), safeBlock.NumberU64()) != update.SafeBlockHash {
 			log.Warn("Safe block not in canonical chain")
-			return beacon.STATUS_INVALID, errors.New("safe block not canonical")
+			return beacon.ForkChoiceResponse{PayloadStatus: api.invalid(errors.New("safe head not canonical")), PayloadID: nil}, nil
 		}
 	}
 	// If payload generation was requested, create a new block to be potentially
