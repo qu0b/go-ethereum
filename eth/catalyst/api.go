@@ -244,7 +244,7 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 	)
 	if td.Cmp(ttd) < 0 {
 		log.Warn("Ignoring pre-merge payload", "number", params.Number, "hash", params.BlockHash, "td", td, "ttd", ttd)
-		return beacon.PayloadStatusV1{Status: beacon.INVALIDBLOCKHASH}, nil
+		return beacon.PayloadStatusV1{Status: beacon.INVALIDTERMINALBLOCK}, nil
 	}
 	log.Trace("Inserting block without sethead", "hash", block.Hash(), "number", block.Number)
 	if err := api.eth.BlockChain().InsertBlockWithoutSetHead(block); err != nil {
