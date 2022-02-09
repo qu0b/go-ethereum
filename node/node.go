@@ -342,7 +342,18 @@ func (n *Node) closeDataDir() {
 	}
 }
 
-func (n *Node) obtainJWTSecret() ([]byte, error) {
+// obtainJWTSecret loads the jwt-secret, either from the provided config,
+// or from the default location. If neither of those are present, it generates
+// a new secret and stores to the default location.
+func (n *Node) obtainJWTSecret(cliParam string) ([]byte, error) {
+	// If one was provided via cli flags, use that
+	if len(cliParam) > 0 {
+		jwtSecret := common.FromHex(cliParam)
+		if len(jwtSecret) == 32 {
+			return jwtSecret, nil
+		}
+		log.Warn("Discarding provided jwt secret", "size", len(jwtSecret))
+	}
 	jwtFile := n.ResolvePath(datadirJWTKey)
 	log.Debug("Reading jwt-key", "path", jwtFile)
 	if data, err := os.ReadFile(jwtFile); err == nil {
@@ -387,7 +398,7 @@ func (n *Node) startRPC() error {
 	)
 	open = open[1:]
 	if len(open) != len(all) {
-		if s, err := n.obtainJWTSecret(); err != nil {
+		if s, err := n.obtainJWTSecret(n.config.JwtSecret); err != nil {
 			return err
 		} else {
 			jwtSecret = s
