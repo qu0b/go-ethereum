@@ -396,7 +396,6 @@ func (n *Node) startRPC() error {
 		open, all = n.GetAPIs()
 		jwtSecret []byte
 	)
-	open = open[1:]
 	if len(open) != len(all) {
 		if s, err := n.obtainJWTSecret(n.config.JwtSecret); err != nil {
 			return err
