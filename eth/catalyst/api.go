@@ -77,7 +77,7 @@ func NewConsensusAPI(eth *eth.Ethereum) *ConsensusAPI {
 // If there are payloadAttributes:
 // 		we try to assemble a block with the payloadAttributes and return its payloadID
 func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, payloadAttributes *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
-	log.Trace("Engine API request received", "method", "ForkChoiceUpdated", "head", update.HeadBlockHash, "finalized", update.FinalizedBlockHash, "safe", update.SafeBlockHash)
+	log.Trace("Engine API request received", "method", "ForkchoiceUpdated", "head", update.HeadBlockHash, "finalized", update.FinalizedBlockHash, "safe", update.SafeBlockHash)
 	if update.HeadBlockHash == (common.Hash{}) {
 		log.Warn("Forkchoice requested update to zero hash")
 		return beacon.STATUS_INVALID, nil // TODO(karalabe): Why does someone send us this?
@@ -93,7 +93,7 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 		// that should be fixed, not papered over.
 		header := api.remoteBlocks.get(update.HeadBlockHash)
 		if header == nil {
-			log.Warn("Forkcoice requested unknown head", "hash", update.HeadBlockHash)
+			log.Warn("Forkchoice requested unknown head", "hash", update.HeadBlockHash)
 			return beacon.STATUS_SYNCING, nil
 		}
 		// Header advertised via a past newPayload request. Start syncing to it.
@@ -250,6 +250,10 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 	if td.Cmp(ttd) < 0 {
 		log.Warn("Ignoring pre-merge payload", "number", params.Number, "hash", params.BlockHash, "td", td, "ttd", ttd)
 		return beacon.PayloadStatusV1{Status: beacon.INVALIDTERMINALBLOCK}, nil
+	}
+	if block.Time() <= parent.Time() {
+		log.Warn("Invalid timestamp", "parent", block.Time(), "block", block.Time())
+		return api.invalid(errors.New("invalid timestamp")), nil
 	}
 	log.Trace("Inserting block without sethead", "hash", block.Hash(), "number", block.Number)
 	if err := api.eth.BlockChain().InsertBlockWithoutSetHead(block); err != nil {
