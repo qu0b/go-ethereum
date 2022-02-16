@@ -45,7 +45,6 @@ var (
 	UnknownPayload     = rpc.CustomError{Code: -32001, ValidationError: "Unknown payload"}
 	InvalidTB          = rpc.CustomError{Code: -32002, ValidationError: "Invalid terminal block"}
 
-	STATUS_VALID   = ForkChoiceResponse{PayloadStatus: PayloadStatusV1{Status: VALID}, PayloadID: nil}
 	STATUS_INVALID = ForkChoiceResponse{PayloadStatus: PayloadStatusV1{Status: INVALID}, PayloadID: nil}
 	STATUS_SYNCING = ForkChoiceResponse{PayloadStatus: PayloadStatusV1{Status: SYNCING}, PayloadID: nil}
 )
