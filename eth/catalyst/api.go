@@ -185,9 +185,17 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 		api.localBlocks.put(id, data)
 
 		log.Info("Created payload for sealing", "id", id, "elapsed", time.Since(start))
-		return beacon.ForkChoiceResponse{PayloadStatus: beacon.PayloadStatusV1{Status: beacon.VALID}, PayloadID: &id}, nil
+		return api.validFCU(&id), nil
 	}
-	return beacon.STATUS_VALID, nil
+	return api.validFCU(nil), nil
+}
+
+func (api *ConsensusAPI) validFCU(id *beacon.PayloadID) beacon.ForkChoiceResponse {
+	currentHash := api.eth.BlockChain().CurrentBlock().Hash()
+	return beacon.ForkChoiceResponse{
+		PayloadStatus: beacon.PayloadStatusV1{Status: beacon.VALID, LatestValidHash: &currentHash},
+		PayloadID:     id,
+	}
 }
 
 // GetPayloadV1 returns a cached payload by id.
