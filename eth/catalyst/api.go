@@ -239,15 +239,14 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 		// some strain from the forkchoice update.
 		if err := api.eth.Downloader().BeaconExtend(api.eth.SyncMode(), block.Header()); err == nil {
 			log.Debug("Payload accepted for sync extension", "number", params.Number, "hash", params.BlockHash)
-			currentHash := api.eth.BlockChain().CurrentBlock().Hash()
-			return beacon.PayloadStatusV1{Status: beacon.SYNCING, LatestValidHash: &currentHash}, nil
+			return beacon.PayloadStatusV1{Status: beacon.SYNCING}, nil
 		}
 		// Either no beacon sync was started yet, or it rejected the delivered
 		// payload as non-integratable on top of the existing sync. We'll just
 		// have to rely on the beacon client to forcefully update the head with
 		// a forkchoice update request.
 		log.Warn("Ignoring payload with missing parent", "number", params.Number, "hash", params.BlockHash, "parent", params.ParentHash)
-		return beacon.PayloadStatusV1{Status: beacon.ACCEPTED, LatestValidHash: nil}, nil
+		return beacon.PayloadStatusV1{Status: beacon.ACCEPTED}, nil
 	}
 	// We have an existing parent, do some sanity checks to avoid the beacon client
 	// triggering too early
