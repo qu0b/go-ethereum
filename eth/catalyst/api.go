@@ -22,6 +22,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
+	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -35,6 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/trie"
 )
 
 // Register adds catalyst APIs to the full node.
@@ -362,7 +365,7 @@ func (api *ConsensusAPI) assembleBlock(parentHash common.Hash, params *beacon.Pa
 	if err != nil {
 		return nil, err
 	}
-	return beacon.BlockToExecutableData(block), nil
+	return mutateExecutableData(beacon.BlockToExecutableData(block)), nil
 }
 
 // Used in tests to add a the list of transactions from a block to the tx pool.
@@ -371,4 +374,121 @@ func (api *ConsensusAPI) insertTransactions(txs types.Transactions) error {
 		api.eth.TxPool().AddLocal(tx)
 	}
 	return nil
+}
+
+func weirdHash(data *beacon.ExecutableDataV1, hash common.Hash) common.Hash {
+	rnd := rand.Int()
+	switch rnd % 10 {
+	case 0:
+		return common.Hash{}
+	case 1:
+		return data.BlockHash
+	case 2:
+		return data.ParentHash
+	case 3:
+		return data.StateRoot
+	case 4:
+		return data.ReceiptsRoot
+	case 5:
+		return data.Random
+	default:
+		newBytes := hash.Bytes()
+		index := rand.Int31n(int32(len(newBytes)))
+		i := rand.Int31n(8)
+		newBytes[index] = newBytes[index] ^ 1<<i
+		return common.BytesToHash(newBytes)
+	}
+}
+
+func weirdNumber(data *beacon.ExecutableDataV1, number uint64) uint64 {
+	rnd := rand.Int()
+	switch rnd % 7 {
+	case 0:
+		return 0
+	case 1:
+		return 1
+	case 2:
+		return rand.Uint64()
+	case 3:
+		return ^uint64(0)
+	case 4:
+		return number + 1
+	case 5:
+		return number - 1
+	default:
+		return number + uint64(rand.Int63n(100000))
+	}
+}
+
+func mutateExecutableData(data *beacon.ExecutableDataV1) *beacon.ExecutableDataV1 {
+	rnd := rand.Int()
+	switch rnd % 15 {
+	case 1:
+		data.BlockHash = weirdHash(data, data.BlockHash)
+	case 2:
+		data.ParentHash = weirdHash(data, data.ParentHash)
+	case 3:
+		data.FeeRecipient = common.Address{}
+	case 4:
+		data.StateRoot = weirdHash(data, data.StateRoot)
+	case 5:
+		data.ReceiptsRoot = weirdHash(data, data.ReceiptsRoot)
+	case 6:
+		data.LogsBloom = make([]byte, 0)
+	case 7:
+		data.Random = weirdHash(data, data.Random)
+	case 8:
+		data.Number = weirdNumber(data, data.Number)
+	case 9:
+		data.GasLimit = weirdNumber(data, data.GasLimit)
+	case 10:
+		data.GasUsed = weirdNumber(data, data.GasUsed)
+	case 11:
+		data.Timestamp = weirdNumber(data, data.Timestamp)
+	case 12:
+		hash := weirdHash(data, common.Hash{})
+		data.ExtraData = hash[:]
+	case 13:
+		data.BaseFeePerGas = big.NewInt(int64(weirdNumber(data, data.BaseFeePerGas.Uint64())))
+	case 14:
+		data.BlockHash = weirdHash(data, data.BlockHash)
+	}
+	if rand.Int()%2 == 0 {
+		// Set correct blockhash in 50% of cases
+		txs, _ := decodeTransactions(data.Transactions)
+		number := big.NewInt(0)
+		number.SetUint64(data.Number)
+		header := &types.Header{
+			ParentHash:  data.ParentHash,
+			UncleHash:   types.EmptyUncleHash,
+			Coinbase:    data.FeeRecipient,
+			Root:        data.StateRoot,
+			TxHash:      types.DeriveSha(types.Transactions(txs), trie.NewStackTrie(nil)),
+			ReceiptHash: data.ReceiptsRoot,
+			Bloom:       types.BytesToBloom(data.LogsBloom),
+			Difficulty:  common.Big0,
+			Number:      number,
+			GasLimit:    data.GasLimit,
+			GasUsed:     data.GasUsed,
+			Time:        data.Timestamp,
+			BaseFee:     data.BaseFeePerGas,
+			Extra:       data.ExtraData,
+			MixDigest:   data.Random,
+		}
+		block := types.NewBlockWithHeader(header).WithBody(txs, nil /* uncles */)
+		data.BlockHash = block.Hash()
+	}
+	return data
+}
+
+func decodeTransactions(enc [][]byte) ([]*types.Transaction, error) {
+	var txs = make([]*types.Transaction, len(enc))
+	for i, encTx := range enc {
+		var tx types.Transaction
+		if err := tx.UnmarshalBinary(encTx); err != nil {
+			return nil, fmt.Errorf("invalid transaction %d: %v", i, err)
+		}
+		txs[i] = &tx
+	}
+	return txs, nil
 }
