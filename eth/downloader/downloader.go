@@ -1357,6 +1357,7 @@ func (d *Downloader) processHeaders(origin uint64, td, ttd *big.Int, beaconMode 
 							ptd = new(big.Int).Add(ptd, header.Difficulty)
 							if ptd.Cmp(ttd) >= 0 {
 								log.Info("Legacy sync reached merge threshold", "number", header.Number, "hash", header.Hash(), "td", ptd, "ttd", ttd)
+								rawdb.WriteTerminalBlockHash(d.stateDB, header.Hash())
 								return ErrMergeTransition
 							}
 						}
