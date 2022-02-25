@@ -18,7 +18,6 @@ package node
 
 import (
 	crand "crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -370,6 +369,8 @@ func (n *Node) obtainJWTSecret(cliParam string) ([]byte, error) {
 		}
 		log.Error("Invalid jwt key", "path", fileName, "length", len(jwtSecret))
 		return nil, errors.New("invalid jwt key")
+	} else {
+		log.Trace("Failed reading potential jwt-key, recreating", "error", err)
 	}
 	// Need to generate one
 	jwtSecret := make([]byte, 32)
@@ -409,9 +410,9 @@ func (n *Node) startRPC() error {
 		if s, err := n.obtainJWTSecret(n.config.JwtSecret); err != nil {
 			return err
 		} else {
-			var dest []byte
-			base64.StdEncoding.Encode(dest, s)
-			log.Warn("Using secret", "str", s, "hex", common.Bytes2Hex(s), "bas64", dest)
+			//var dest []byte
+			//base64.StdEncoding.Encode(dest, s)
+			log.Warn("Using secret", "str", s, "hex", common.Bytes2Hex(s)) //), "bas64", dest)
 			jwtSecret = s
 		}
 	}
