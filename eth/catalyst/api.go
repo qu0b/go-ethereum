@@ -209,7 +209,6 @@ func (api *ConsensusAPI) validFCU(id *beacon.PayloadID) beacon.ForkChoiceRespons
 }
 
 func (api *ConsensusAPI) ExchangeTransitionConfigurationV1(config beacon.TransitionConfigurationV1) (*beacon.TransitionConfigurationV1, error) {
-
 	if config.TerminalTotalDifficulty == nil {
 		return nil, errors.New("invalid terminal total difficulty")
 	}
@@ -227,12 +226,10 @@ func (api *ConsensusAPI) ExchangeTransitionConfigurationV1(config beacon.Transit
 		if config.TerminalBlockHash != (common.Hash{}) && config.TerminalBlockHash != terminalHeader.Hash() {
 			return nil, fmt.Errorf("invalid terminal block hash, got %v want %v", config.TerminalBlockHash, terminalHeader.Hash())
 		}
-
-		return &beacon.TransitionConfigurationV1{
-			TerminalTotalDifficulty: (*hexutil.Big)(ttd),
-			TerminalBlockHash:       terminalHeader.Hash(),
-			TerminalBlockNumber:     hexutil.Uint64(terminalHeader.Number.Uint64()),
-		}, nil
+		// TODO (MariusVanDerWijden): Here we used to return the correct terminal hash + number
+		// but according to the spec we should return the hash + number set by the user.
+		// Since we have no way of setting hash + number yet, just return TTD.
+		return &beacon.TransitionConfigurationV1{TerminalTotalDifficulty: (*hexutil.Big)(ttd)}, nil
 	}
 	if config.TerminalBlockNumber != 0 {
 		return nil, fmt.Errorf("invalid terminal block number: %v", config.TerminalBlockNumber)
