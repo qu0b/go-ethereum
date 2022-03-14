@@ -1360,8 +1360,6 @@ func (d *Downloader) processHeaders(origin uint64, td, ttd *big.Int, beaconMode 
 						for i, header := range chunkHeaders {
 							td = new(big.Int).Add(td, header.Difficulty)
 							if td.Cmp(ttd) >= 0 {
-								// Terminal total difficulty reached, write terminal block hash
-								rawdb.WriteTerminalBlockHash(d.stateDB, header.Hash())
 								// Allow the last header in
 								if new(big.Int).Sub(td, header.Difficulty).Cmp(ttd) < 0 {
 									chunkHeaders, rejected = chunkHeaders[:i+1], chunkHeaders[i+1:]
