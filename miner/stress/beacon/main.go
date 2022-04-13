@@ -133,7 +133,7 @@ func newNode(typ nodetype, genesis *core.Genesis, enodes []*enode.Node) *ethNode
 	if _, err := store.NewAccount(""); err != nil {
 		panic(err)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 	return &ethNode{
 		typ:        typ,
 		api:        api,
@@ -336,7 +336,7 @@ func (mgr *nodeManager) run() {
 		log.Info("Finalised eth2 block", "number", oldest.NumberU64(), "hash", oldest.Hash())
 		waitFinalise = waitFinalise[1:]
 	}
-	finalizeTimer := time.NewTimer(3 * time.Minute)
+	finalizeTimer := time.NewTimer(4 * time.Minute)
 
 	for {
 		checkFinalise()
@@ -558,9 +558,10 @@ func makeFullNode(genesis *core.Genesis) (*node.Node, *eth.Ethereum, *ethcatalys
 		return nil, nil, nil, err
 	}
 	econfig := &ethconfig.Config{
-		Genesis:         genesis,
-		NetworkId:       genesis.Config.ChainID.Uint64(),
-		SyncMode:        downloader.FullSync,
+		Genesis:   genesis,
+		NetworkId: genesis.Config.ChainID.Uint64(),
+		//SyncMode:  downloader.FullSync,
+		SyncMode:        downloader.SnapSync,
 		DatabaseCache:   256,
 		DatabaseHandles: 256,
 		TxPool:          core.DefaultTxPoolConfig,
@@ -571,7 +572,7 @@ func makeFullNode(genesis *core.Genesis) (*node.Node, *eth.Ethereum, *ethcatalys
 			GasFloor: genesis.GasLimit * 9 / 10,
 			GasCeil:  genesis.GasLimit * 11 / 10,
 			GasPrice: big.NewInt(1),
-			Recommit: 10 * time.Second, // Disable the recommit
+			Recommit: 2 * time.Second, // Disable the recommit
 		},
 		LightServ:        100,
 		LightPeers:       10,
