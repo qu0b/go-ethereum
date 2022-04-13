@@ -254,6 +254,7 @@ func (mgr *nodeManager) createNode(typ nodetype) {
 	node := newNode(typ, mgr.genesis, mgr.enodes)
 	mgr.nodes = append(mgr.nodes, node)
 	mgr.enodes = append(mgr.enodes, node.enode)
+	log.Warn("Adding node", "nodes", len(mgr.nodes))
 }
 
 func (mgr *nodeManager) getNodes(typ nodetype) []*ethNode {
