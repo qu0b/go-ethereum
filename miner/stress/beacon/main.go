@@ -167,6 +167,9 @@ func (n *ethNode) assembleBlock(parentHash common.Hash, parentTimestamp uint64) 
 	if err != nil {
 		return nil, err
 	}
+	if payload.PayloadID == nil {
+		return nil, errors.New("no payload id")
+	}
 	return n.api.GetPayloadV1(*payload.PayloadID)
 }
 
@@ -287,7 +290,7 @@ func (mgr *nodeManager) run() {
 		return
 	}
 	chain := mgr.nodes[0].ethBackend.BlockChain()
-	sink := make(chan core.ChainHeadEvent, 2048)
+	sink := make(chan core.ChainHeadEvent, 65536)
 	sub := chain.SubscribeChainHeadEvent(sink)
 	defer sub.Unsubscribe()
 
@@ -376,6 +379,7 @@ func (mgr *nodeManager) run() {
 			}
 			ed, err := producers[producerIndex].assembleBlock(hash, timestamp)
 			if err != nil {
+				timer.Reset(blockInterval)
 				log.Error("Failed to assemble the block", "err", err)
 				continue
 			}
@@ -384,6 +388,7 @@ func (mgr *nodeManager) run() {
 			ed2, err := producers[producerIndex].assembleBlock(hash, timestamp+12)
 			if err != nil {
 				log.Error("Failed to assemble the block", "err", err)
+				timer.Reset(blockInterval)
 				continue
 			}
 
@@ -416,6 +421,7 @@ func (mgr *nodeManager) run() {
 							ed3, err := producers[producerIndex].assembleBlock(waitFinalise[index].Hash(), waitFinalise[index].Time())
 							if err != nil {
 								log.Error("Failed to assemble the block", "err", err)
+								return
 							}
 							if err := node.insertBlockAndSetHead(waitFinalise[0].Header(), *ed3); err != nil {
 								log.Error("Failed to insert block", "type", node.typ, "err", err)
@@ -432,7 +438,7 @@ func (mgr *nodeManager) run() {
 		case <-finalizeTimer.C:
 			if len(waitFinalise) == 0 {
 				log.Warn("No pos blocks yet, waiting")
-				timer.Reset(time.Minute)
+				finalizeTimer.Reset(time.Minute)
 				continue
 			}
 			oldest := waitFinalise[0]
@@ -454,7 +460,7 @@ func (mgr *nodeManager) run() {
 			}
 
 			mgr.createNode(eth2MiningNode)
-			timer.Reset(time.Minute)
+			finalizeTimer.Reset(time.Minute)
 		}
 	}
 }
