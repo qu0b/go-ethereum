@@ -705,6 +705,8 @@ func (s *Syncer) loadSyncStatus() {
 					}
 				}
 			}
+			s.lock.Lock()
+			defer s.lock.Unlock()
 			s.snapped = len(s.tasks) == 0
 
 			s.accountSynced = progress.AccountSynced
