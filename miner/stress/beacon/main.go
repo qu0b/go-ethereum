@@ -80,10 +80,10 @@ func (typ nodetype) String() string {
 
 var (
 	// transitionDifficulty is the target total difficulty for transition
-	transitionDifficulty = new(big.Int).Mul(big.NewInt(20), params.MinimumDifficulty)
+	transitionDifficulty = new(big.Int).Sub(new(big.Int).Mul(big.NewInt(20), params.MinimumDifficulty), common.Big1)
 
 	// blockInterval is the time interval for creating a new eth2 block
-	blockInterval    = time.Microsecond * 3
+	blockInterval    = time.Millisecond * 3
 	blockIntervalInt = 3
 
 	// finalizationDist is the block distance for finalizing block
@@ -113,7 +113,7 @@ func newNode(typ nodetype, genesis *core.Genesis, enodes []*enode.Node) *ethNode
 	if typ == eth2LightClient {
 		stack, lesBackend, lapi, err = makeLightNode(genesis)
 	} else {
-		stack, ethBackend, api, err = makeFullNode(genesis)
+		stack, ethBackend, api, err = makeFullNode(typ, genesis)
 	}
 	if err != nil {
 		panic(err)
@@ -234,6 +234,7 @@ type nodeManager struct {
 	nodes        []*ethNode
 	enodes       []*enode.Node
 	close        chan struct{}
+	mu           sync.Mutex
 }
 
 func newNodeManager(genesis *core.Genesis) *nodeManager {
@@ -245,12 +246,16 @@ func newNodeManager(genesis *core.Genesis) *nodeManager {
 }
 
 func (mgr *nodeManager) createNode(typ nodetype) {
+	mgr.mu.Lock()
+	defer mgr.mu.Unlock()
 	node := newNode(typ, mgr.genesis, mgr.enodes)
 	mgr.nodes = append(mgr.nodes, node)
 	mgr.enodes = append(mgr.enodes, node.enode)
 }
 
 func (mgr *nodeManager) getNodes(typ nodetype) []*ethNode {
+	mgr.mu.Lock()
+	defer mgr.mu.Unlock()
 	var ret []*ethNode
 	for _, node := range mgr.nodes {
 		if node.typ == typ {
@@ -261,7 +266,9 @@ func (mgr *nodeManager) getNodes(typ nodetype) []*ethNode {
 }
 
 func (mgr *nodeManager) startMining() {
-	for _, node := range append(mgr.getNodes(eth2MiningNode), mgr.getNodes(legacyMiningNode)...) {
+	nodes := append(mgr.getNodes(eth2MiningNode), mgr.getNodes(legacyMiningNode)...)
+	for _, node := range nodes {
+		log.Warn("Starting mining", "node", node.typ, "ttd", node.ethBackend.BlockChain().Config().TerminalTotalDifficulty)
 		if err := node.ethBackend.StartMining(1); err != nil {
 			panic(err)
 		}
@@ -336,7 +343,7 @@ func (mgr *nodeManager) run() {
 		log.Info("Finalised eth2 block", "number", oldest.NumberU64(), "hash", oldest.Hash())
 		waitFinalise = waitFinalise[1:]
 	}
-	finalizeTimer := time.NewTimer(4 * time.Minute)
+	finalizeTimer := time.NewTimer(2 * time.Minute)
 
 	for {
 		checkFinalise()
@@ -358,7 +365,8 @@ func (mgr *nodeManager) run() {
 
 		case <-timer.C:
 			producers := mgr.getNodes(eth2MiningNode)
-			if len(producers) == 0 {
+			if len(producers) == 0 || parentBlock == nil {
+				timer.Reset(blockInterval)
 				continue
 			}
 			producerIndex := rand.Int31n(int32(len(producers)))
@@ -422,6 +430,11 @@ func (mgr *nodeManager) run() {
 			waitFinalise = append(waitFinalise, block)
 			timer.Reset(blockInterval)
 		case <-finalizeTimer.C:
+			if len(waitFinalise) == 0 {
+				log.Warn("No pos blocks yet, waiting")
+				timer.Reset(time.Minute)
+				continue
+			}
 			oldest := waitFinalise[0]
 			nodes := mgr.getNodes(eth2MiningNode)
 			nodes = append(nodes, mgr.getNodes(eth2NormalNode)...)
@@ -440,7 +453,7 @@ func (mgr *nodeManager) run() {
 				}
 			}
 
-			mgr.createNode(eth2NormalNode)
+			mgr.createNode(eth2MiningNode)
 			timer.Reset(time.Minute)
 		}
 	}
@@ -463,12 +476,10 @@ func main() {
 	manager := newNodeManager(genesis)
 	defer manager.shutdown()
 
-	manager.createNode(eth2NormalNode)
 	manager.createNode(eth2MiningNode)
-	manager.createNode(eth2MiningNode)
-	manager.createNode(eth2MiningNode)
-	manager.createNode(legacyMiningNode)
 	manager.createNode(legacyNormalNode)
+	manager.createNode(eth2NormalNode)
+	manager.createNode(legacyMiningNode)
 	manager.createNode(eth2LightClient)
 
 	// Iterate over all the nodes and start mining
@@ -537,7 +548,7 @@ func makeGenesis(faucets []*ecdsa.PrivateKey) *core.Genesis {
 	return genesis
 }
 
-func makeFullNode(genesis *core.Genesis) (*node.Node, *eth.Ethereum, *ethcatalyst.ConsensusAPI, error) {
+func makeFullNode(typ nodetype, genesis *core.Genesis) (*node.Node, *eth.Ethereum, *ethcatalyst.ConsensusAPI, error) {
 	// Define the basic configurations for the Ethereum node
 	datadir, _ := ioutil.TempDir("", "")
 
@@ -557,11 +568,22 @@ func makeFullNode(genesis *core.Genesis) (*node.Node, *eth.Ethereum, *ethcatalys
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	ttd := genesis.Config.TerminalTotalDifficulty
+	if typ == legacyMiningNode || typ == legacyNormalNode {
+		genesis.Config.TerminalTotalDifficulty = nil
+	}
+	newConfig := *genesis.Config
+	newGenesis := *genesis
+	newGenesis.Config = &newConfig
+	syncMode := downloader.SnapSync
+	if typ == legacyNormalNode {
+		syncMode = downloader.FullSync
+	}
 	econfig := &ethconfig.Config{
-		Genesis:   genesis,
+		Genesis:   &newGenesis,
 		NetworkId: genesis.Config.ChainID.Uint64(),
 		//SyncMode:  downloader.FullSync,
-		SyncMode:        downloader.SnapSync,
+		SyncMode:        syncMode,
 		DatabaseCache:   256,
 		DatabaseHandles: 256,
 		TxPool:          core.DefaultTxPoolConfig,
@@ -587,6 +609,10 @@ func makeFullNode(genesis *core.Genesis) (*node.Node, *eth.Ethereum, *ethcatalys
 		log.Crit("Failed to create the LES server", "err", err)
 	}
 	err = stack.Start()
+	if typ == legacyMiningNode || typ == legacyNormalNode {
+		genesis.Config.TerminalTotalDifficulty = ttd
+		return stack, ethBackend, nil, err
+	}
 	return stack, ethBackend, ethcatalyst.NewConsensusAPI(ethBackend), err
 }
 
