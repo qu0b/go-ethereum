@@ -103,6 +103,7 @@ var (
 	// Path-based trie node scheme.
 	trieNodeAccountPrefix = []byte("A") // trieNodeAccountPrefix + hexPath -> trie node
 	trieNodeStoragePrefix = []byte("O") // trieNodeStoragePrefix + accountHash + hexPath -> trie node
+	supplyDeltaPrefix = []byte("e") // supplyDeltaPrefix + num (uint64 big endian) + hash -> wei diff
 
 	PreimagePrefix = []byte("secure-key-")       // PreimagePrefix + hash -> preimage
 	configPrefix   = []byte("ethereum-config-")  // config prefix for the db
@@ -239,6 +240,7 @@ func genesisStateSpecKey(hash common.Hash) []byte {
 	return append(genesisPrefix, hash.Bytes()...)
 }
 
+<<<<<<< HEAD
 // accountTrieNodeKey = trieNodeAccountPrefix + nodePath.
 func accountTrieNodeKey(path []byte) []byte {
 	return append(trieNodeAccountPrefix, path...)
@@ -247,4 +249,9 @@ func accountTrieNodeKey(path []byte) []byte {
 // storageTrieNodeKey = trieNodeStoragePrefix + accountHash + nodePath.
 func storageTrieNodeKey(accountHash common.Hash, path []byte) []byte {
 	return append(append(trieNodeStoragePrefix, accountHash.Bytes()...), path...)
+=======
+// supplyDeltaKey = supplyDeltaPrefix + num (uint64 big endian) + hash
+func supplyDeltaKey(number uint64, hash common.Hash) []byte {
+	return append(append(supplyDeltaPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
+>>>>>>> c736fb85d (cmd/geth: add initial balance calculation from snapshot)
 }

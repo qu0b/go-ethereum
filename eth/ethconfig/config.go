@@ -186,8 +186,11 @@ type Config struct {
 	// Enables tracking of SHA3 preimages in the VM
 	EnablePreimageRecording bool
 
-	// Enables tracking Ether issuance during block processing
-	EnableIssuanceRecording bool
+	// Miscellaneous options
+	DocRoot string `toml:"-"`
+
+	// Enables tracking Ether supply deltas during block processing.
+	EnableSupplyDeltaRecording bool
 
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap uint64
