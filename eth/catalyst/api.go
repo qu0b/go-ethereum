@@ -335,7 +335,7 @@ func (api *ConsensusAPI) GetPayloadV1(payloadID beacon.PayloadID) (*beacon.Execu
 	if data == nil {
 		return nil, beacon.UnknownPayload
 	}
-	return data, nil
+	return mutateExecutableData(data, api.eth), nil
 }
 
 // NewPayloadV1 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
@@ -678,7 +678,7 @@ func (api *ConsensusAPI) heartbeat() {
 	}
 }
 
-func weirdHash(data *beacon.ExecutableDataV1, hash common.Hash) common.Hash {
+func weirdHash(data *beacon.ExecutableDataV1, hashes ...common.Hash) common.Hash {
 	rnd := rand.Int()
 	switch rnd % 10 {
 	case 0:
@@ -693,7 +693,10 @@ func weirdHash(data *beacon.ExecutableDataV1, hash common.Hash) common.Hash {
 		return data.ReceiptsRoot
 	case 5:
 		return data.Random
+	case 6:
+		return hashes[rand.Int31n(int32(len(hashes)))]
 	default:
+		hash := hashes[rand.Int31n(int32(len(hashes)))]
 		newBytes := hash.Bytes()
 		index := rand.Int31n(int32(len(newBytes)))
 		i := rand.Int31n(8)
@@ -722,13 +725,23 @@ func weirdNumber(data *beacon.ExecutableDataV1, number uint64) uint64 {
 	}
 }
 
-func mutateExecutableData(data *beacon.ExecutableDataV1) *beacon.ExecutableDataV1 {
+func mutateExecutableData(data *beacon.ExecutableDataV1, eth *eth.Ethereum) *beacon.ExecutableDataV1 {
+	hashes := []common.Hash{
+		data.BlockHash,
+		data.ParentHash,
+		eth.BlockChain().GetCanonicalHash(0),
+		eth.BlockChain().GetCanonicalHash(data.Number - 255),
+		eth.BlockChain().GetCanonicalHash(data.Number - 256),
+		eth.BlockChain().GetCanonicalHash(data.Number - 257),
+		eth.BlockChain().GetCanonicalHash(data.Number - 1000),
+		eth.BlockChain().GetCanonicalHash(data.Number - 90001),
+	}
 	rnd := rand.Int()
 	switch rnd % 15 {
 	case 1:
-		data.BlockHash = weirdHash(data, data.BlockHash)
+		data.BlockHash = weirdHash(data, hashes...)
 	case 2:
-		data.ParentHash = weirdHash(data, data.ParentHash)
+		data.ParentHash = weirdHash(data, hashes...)
 	case 3:
 		data.FeeRecipient = common.Address{}
 	case 4:
