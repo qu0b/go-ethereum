@@ -112,7 +112,7 @@ func (b *beaconBackfiller) resume() {
 			log.Error("Beacon backfilling failed", "err", err)
 			if strings.Contains(err.Error(), "retrieved hash chain is invalid") {
 				splits := strings.Split(err.Error(), ": ")
-				invalidBlock := common.HexToAddress(splits[1][:66])
+				invalidBlock := common.HexToAddress(splits[2][:66])
 				b.invalidBlocks[invalidBlock.Hash()] = struct{}{}
 			}
 			return
