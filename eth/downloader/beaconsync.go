@@ -39,7 +39,6 @@ type beaconBackfiller struct {
 	filled     *types.Header // Last header filled by the last terminated sync loop
 	started    chan struct{} // Notification channel whether the downloader inited
 	lock       sync.Mutex    // Mutex protecting the sync lock
-	invalids   map[common.Hash]struct{}
 }
 
 // newBeaconBackfiller is a helper method to create the backfiller.
@@ -47,7 +46,6 @@ func newBeaconBackfiller(dl *Downloader, success func()) backfiller {
 	return &beaconBackfiller{
 		downloader: dl,
 		success:    success,
-		invalids:   make(map[common.Hash]struct{}),
 	}
 }
 
@@ -108,7 +106,6 @@ func (b *beaconBackfiller) resume() {
 		// If the downloader fails, report an error as in beacon chain mode there
 		// should be no errors as long as the chain we're syncing to is valid.
 		if err := b.downloader.synchronise("", common.Hash{}, nil, nil, mode, true, b.started); err != nil {
-			panic(err)
 			log.Error("Beacon backfilling failed", "err", err)
 			return
 		}
@@ -146,8 +143,8 @@ func (b *beaconBackfiller) setMode(mode SyncMode) {
 //
 // Internally backfilling and state sync is done the same way, but the header
 // retrieval and scheduling is replaced.
-func (d *Downloader) BeaconSync(mode SyncMode, head *types.Header) error {
-	return d.beaconSync(mode, head, true)
+func (d *Downloader) BeaconSync(mode SyncMode, head *types.Header, invalidBlock map[common.Hash]struct{}) error {
+	return d.beaconSync(mode, head, true, invalidBlock)
 }
 
 // BeaconExtend is an optimistic version of BeaconSync, where an attempt is made
@@ -157,7 +154,7 @@ func (d *Downloader) BeaconSync(mode SyncMode, head *types.Header) error {
 // This is useful if a beacon client is feeding us large chunks of payloads to run,
 // but is not setting the head after each.
 func (d *Downloader) BeaconExtend(mode SyncMode, head *types.Header) error {
-	return d.beaconSync(mode, head, false)
+	return d.beaconSync(mode, head, false, make(map[common.Hash]struct{}))
 }
 
 // beaconSync is the post-merge version of the chain synchronization, where the
@@ -166,7 +163,7 @@ func (d *Downloader) BeaconExtend(mode SyncMode, head *types.Header) error {
 //
 // Internally backfilling and state sync is done the same way, but the header
 // retrieval and scheduling is replaced.
-func (d *Downloader) beaconSync(mode SyncMode, head *types.Header, force bool) error {
+func (d *Downloader) beaconSync(mode SyncMode, head *types.Header, force bool, invalidBlocks map[common.Hash]struct{}) error {
 	// When the downloader starts a sync cycle, it needs to be aware of the sync
 	// mode to use (full, snap). To keep the skeleton chain oblivious, inject the
 	// mode into the backfiller directly.
@@ -174,6 +171,8 @@ func (d *Downloader) beaconSync(mode SyncMode, head *types.Header, force bool) e
 	// Super crazy dangerous type cast. Should be fine (TM), we're only using a
 	// different backfiller implementation for skeleton tests.
 	d.skeleton.filler.(*beaconBackfiller).setMode(mode)
+
+	d.skeleton.invalidBlocks = invalidBlocks
 
 	// Signal the skeleton sync to switch to a new head, however it wants
 	if err := d.skeleton.Sync(head, force); err != nil {

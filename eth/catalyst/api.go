@@ -59,9 +59,10 @@ func Register(stack *node.Node, backend *eth.Ethereum) error {
 }
 
 type ConsensusAPI struct {
-	eth          *eth.Ethereum
-	remoteBlocks *headerQueue  // Cache of remote payloads received
-	localBlocks  *payloadQueue // Cache of local payloads generated
+	eth           *eth.Ethereum
+	remoteBlocks  *headerQueue             // Cache of remote payloads received
+	localBlocks   *payloadQueue            // Cache of local payloads generated
+	invalidBlocks map[common.Hash]struct{} // Cache of invalid payloads received
 	// Lock for the forkChoiceUpdated method
 	forkChoiceLock sync.Mutex
 }
@@ -72,10 +73,12 @@ func NewConsensusAPI(eth *eth.Ethereum) *ConsensusAPI {
 	if eth.BlockChain().Config().TerminalTotalDifficulty == nil {
 		panic("Catalyst started without valid total difficulty")
 	}
+	invblocks := make(map[common.Hash]struct{})
 	return &ConsensusAPI{
-		eth:          eth,
-		remoteBlocks: newHeaderQueue(),
-		localBlocks:  newPayloadQueue(),
+		eth:           eth,
+		remoteBlocks:  newHeaderQueue(),
+		localBlocks:   newPayloadQueue(),
+		invalidBlocks: invblocks,
 	}
 }
 
@@ -121,7 +124,7 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 			api.eth.Downloader().Cancel()
 		}
 		log.Info("Forkchoice requested sync to new head", "number", header.Number, "hash", header.Hash())
-		if err := api.eth.Downloader().BeaconSync(api.eth.SyncMode(), header); err != nil {
+		if err := api.eth.Downloader().BeaconSync(api.eth.SyncMode(), header, api.invalidBlocks); err != nil {
 			return beacon.STATUS_SYNCING, err
 		}
 		return beacon.STATUS_SYNCING, nil
@@ -256,6 +259,7 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 	log.Trace("Engine API request received", "method", "ExecutePayload", "number", params.Number, "hash", params.BlockHash)
 	block, err := beacon.ExecutableDataToBlock(params)
 	if err != nil {
+		api.invalidBlocks[params.BlockHash] = struct{}{}
 		log.Debug("Invalid NewPayload params", "params", params, "error", err)
 		return beacon.PayloadStatusV1{Status: beacon.INVALIDBLOCKHASH}, nil
 	}

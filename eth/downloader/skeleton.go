@@ -212,7 +212,8 @@ type skeleton struct {
 	terminated chan struct{}    // Channel to signal that the syner is dead
 
 	// Callback hooks used during testing
-	syncStarting func() // callback triggered after a sync cycle is inited but before started
+	syncStarting  func() // callback triggered after a sync cycle is inited but before started
+	invalidBlocks map[common.Hash]struct{}
 }
 
 // newSkeleton creates a new sync skeleton that tracks a potentially dangling
@@ -406,6 +407,7 @@ func (s *skeleton) sync(head *types.Header) (*types.Header, error) {
 	if s.syncStarting != nil {
 		s.syncStarting()
 	}
+	var errNonLink error
 	for {
 		// Something happened, try to assign new tasks to any idle peers
 		if !linked {
@@ -447,7 +449,7 @@ func (s *skeleton) sync(head *types.Header) (*types.Header, error) {
 				event.errc <- errReorgDenied
 				continue
 			}
-			event.errc <- nil // head extension accepted
+			event.errc <- errNonLink // head extension accepted
 
 			// New head was integrated into the skeleton chain. If the backfiller
 			// is still running, it will pick it up. If it already terminated,
@@ -466,7 +468,10 @@ func (s *skeleton) sync(head *types.Header) (*types.Header, error) {
 			//
 			// If we managed to link to the existing local chain or genesis block,
 			// abort sync altogether.
-			linked, merged := s.processResponse(res)
+			linked, merged, err := s.processResponse(res)
+			if err != nil {
+				errNonLink = err
+			}
 			if linked {
 				log.Debug("Beacon sync linked to local chain")
 				return nil, errSyncLinked
@@ -875,7 +880,7 @@ func (s *skeleton) revertRequest(req *headerRequest) {
 	s.scratchOwners[(s.scratchHead-req.head)/requestHeaders] = ""
 }
 
-func (s *skeleton) processResponse(res *headerResponse) (linked bool, merged bool) {
+func (s *skeleton) processResponse(res *headerResponse) (linked bool, merged bool, err error) {
 	res.peer.log.Trace("Processing header response", "head", res.headers[0].Number, "hash", res.headers[0].Hash(), "count", len(res.headers))
 
 	// Whether the response is valid, we can mark the peer as idle and notify
@@ -889,7 +894,7 @@ func (s *skeleton) processResponse(res *headerResponse) (linked bool, merged boo
 		// gets fulfilled successfully. It should not be possible to deliver a
 		// response to a non-existing request.
 		res.peer.log.Error("Unexpected header packet")
-		return false, false
+		return false, false, nil
 	}
 	delete(s.requests, res.reqid)
 
@@ -900,7 +905,7 @@ func (s *skeleton) processResponse(res *headerResponse) (linked bool, merged boo
 
 	// If there's still a gap in the head of the scratch space, abort
 	if s.scratchSpace[0] == nil {
-		return false, false
+		return false, false, nil
 	}
 	// Try to consume any head headers, validating the boundary conditions
 	batch := s.db.NewBatch()
@@ -954,6 +959,10 @@ func (s *skeleton) processResponse(res *headerResponse) (linked bool, merged boo
 					linked = true
 					break
 				}
+			}
+			if _, ok := s.invalidBlocks[header.ParentHash]; ok {
+				log.Error("Block depends on invalid block")
+				return false, false, errors.New("invalid parent block")
 			}
 		}
 		head := s.progress.Subchains[0].Head
@@ -1074,7 +1083,7 @@ func (s *skeleton) processResponse(res *headerResponse) (linked bool, merged boo
 			log.Info("Syncing beacon headers", "downloaded", s.pulled, "left", left, "eta", common.PrettyDuration(eta))
 		}
 	}
-	return linked, merged
+	return linked, merged, nil
 }
 
 // cleanStales removes previously synced beacon headers that have become stale
