@@ -183,6 +183,9 @@ func (d *Downloader) beaconSync(mode SyncMode, head *types.Header, force bool) e
 	if _, ok := d.skeleton.filler.(*beaconBackfiller).invalidBlocks[head.ParentHash]; ok {
 		return errors.New("parent is marked invalid")
 	}
+	if _, ok := d.skeleton.filler.(*beaconBackfiller).invalidBlocks[head.Hash()]; ok {
+		return errors.New("parent is marked invalid")
+	}
 
 	// Signal the skeleton sync to switch to a new head, however it wants
 	if err := d.skeleton.Sync(head, force); err != nil {
