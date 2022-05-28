@@ -47,8 +47,9 @@ type beaconBackfiller struct {
 // newBeaconBackfiller is a helper method to create the backfiller.
 func newBeaconBackfiller(dl *Downloader, success func()) backfiller {
 	return &beaconBackfiller{
-		downloader: dl,
-		success:    success,
+		downloader:    dl,
+		success:       success,
+		invalidBlocks: make(map[common.Hash]struct{}),
 	}
 }
 
