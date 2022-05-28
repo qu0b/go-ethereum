@@ -17,7 +17,9 @@
 package downloader
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,13 +34,14 @@ import (
 // the genesis block or an existing header in the database. Its operation is fully
 // directed by the skeleton sync's head/tail events.
 type beaconBackfiller struct {
-	downloader *Downloader   // Downloader to direct via this callback implementation
-	syncMode   SyncMode      // Sync mode to use for backfilling the skeleton chains
-	success    func()        // Callback to run on successful sync cycle completion
-	filling    bool          // Flag whether the downloader is backfilling or not
-	filled     *types.Header // Last header filled by the last terminated sync loop
-	started    chan struct{} // Notification channel whether the downloader inited
-	lock       sync.Mutex    // Mutex protecting the sync lock
+	downloader    *Downloader   // Downloader to direct via this callback implementation
+	syncMode      SyncMode      // Sync mode to use for backfilling the skeleton chains
+	success       func()        // Callback to run on successful sync cycle completion
+	filling       bool          // Flag whether the downloader is backfilling or not
+	filled        *types.Header // Last header filled by the last terminated sync loop
+	started       chan struct{} // Notification channel whether the downloader inited
+	lock          sync.Mutex    // Mutex protecting the sync lock
+	invalidBlocks map[common.Hash]struct{}
 }
 
 // newBeaconBackfiller is a helper method to create the backfiller.
@@ -107,6 +110,11 @@ func (b *beaconBackfiller) resume() {
 		// should be no errors as long as the chain we're syncing to is valid.
 		if err := b.downloader.synchronise("", common.Hash{}, nil, nil, mode, true, b.started); err != nil {
 			log.Error("Beacon backfilling failed", "err", err)
+			if strings.Contains(err.Error(), "retrieved hash chain is invalid") {
+				splits := strings.Split(err.Error(), ": ")
+				invalidBlock := common.HexToAddress(splits[1][:66])
+				b.invalidBlocks[invalidBlock.Hash()] = struct{}{}
+			}
 			return
 		}
 		// Synchronization succeeded. Since this happens async, notify the outer
@@ -143,8 +151,8 @@ func (b *beaconBackfiller) setMode(mode SyncMode) {
 //
 // Internally backfilling and state sync is done the same way, but the header
 // retrieval and scheduling is replaced.
-func (d *Downloader) BeaconSync(mode SyncMode, head *types.Header, invalidBlock map[common.Hash]struct{}) error {
-	return d.beaconSync(mode, head, true, invalidBlock)
+func (d *Downloader) BeaconSync(mode SyncMode, head *types.Header) error {
+	return d.beaconSync(mode, head, true)
 }
 
 // BeaconExtend is an optimistic version of BeaconSync, where an attempt is made
@@ -154,7 +162,7 @@ func (d *Downloader) BeaconSync(mode SyncMode, head *types.Header, invalidBlock 
 // This is useful if a beacon client is feeding us large chunks of payloads to run,
 // but is not setting the head after each.
 func (d *Downloader) BeaconExtend(mode SyncMode, head *types.Header) error {
-	return d.beaconSync(mode, head, false, make(map[common.Hash]struct{}))
+	return d.beaconSync(mode, head, false)
 }
 
 // beaconSync is the post-merge version of the chain synchronization, where the
@@ -163,7 +171,7 @@ func (d *Downloader) BeaconExtend(mode SyncMode, head *types.Header) error {
 //
 // Internally backfilling and state sync is done the same way, but the header
 // retrieval and scheduling is replaced.
-func (d *Downloader) beaconSync(mode SyncMode, head *types.Header, force bool, invalidBlocks map[common.Hash]struct{}) error {
+func (d *Downloader) beaconSync(mode SyncMode, head *types.Header, force bool) error {
 	// When the downloader starts a sync cycle, it needs to be aware of the sync
 	// mode to use (full, snap). To keep the skeleton chain oblivious, inject the
 	// mode into the backfiller directly.
@@ -171,8 +179,9 @@ func (d *Downloader) beaconSync(mode SyncMode, head *types.Header, force bool, i
 	// Super crazy dangerous type cast. Should be fine (TM), we're only using a
 	// different backfiller implementation for skeleton tests.
 	d.skeleton.filler.(*beaconBackfiller).setMode(mode)
-
-	d.skeleton.invalidBlocks = invalidBlocks
+	if _, ok := d.skeleton.filler.(*beaconBackfiller).invalidBlocks[head.ParentHash]; ok {
+		return errors.New("parent is marked invalid")
+	}
 
 	// Signal the skeleton sync to switch to a new head, however it wants
 	if err := d.skeleton.Sync(head, force); err != nil {
