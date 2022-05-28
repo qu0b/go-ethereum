@@ -167,6 +167,8 @@ func (d *Downloader) BeaconExtend(mode SyncMode, head *types.Header) error {
 	return d.beaconSync(mode, head, false)
 }
 
+var InvalidParentErr = errors.New("parent is marked invalid")
+
 // beaconSync is the post-merge version of the chain synchronization, where the
 // chain is not downloaded from genesis onward, rather from trusted head announces
 // backwards.
@@ -182,10 +184,10 @@ func (d *Downloader) beaconSync(mode SyncMode, head *types.Header, force bool) e
 	// different backfiller implementation for skeleton tests.
 	d.skeleton.filler.(*beaconBackfiller).setMode(mode)
 	if _, ok := d.skeleton.filler.(*beaconBackfiller).invalidBlocks[head.ParentHash]; ok {
-		return errors.New("parent is marked invalid")
+		return InvalidParentErr
 	}
 	if _, ok := d.skeleton.filler.(*beaconBackfiller).invalidBlocks[head.Hash()]; ok {
-		return errors.New("parent is marked invalid")
+		return InvalidParentErr
 	}
 
 	// Signal the skeleton sync to switch to a new head, however it wants

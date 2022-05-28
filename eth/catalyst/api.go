@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
+	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -281,9 +282,13 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.Pa
 		// Although we don't want to trigger a sync, if there is one already in
 		// progress, try to extend if with the current payload request to relieve
 		// some strain from the forkchoice update.
-		if err := api.eth.Downloader().BeaconExtend(api.eth.SyncMode(), block.Header()); err == nil {
+		err := api.eth.Downloader().BeaconExtend(api.eth.SyncMode(), block.Header())
+		if err == nil {
 			log.Debug("Payload accepted for sync extension", "number", params.Number, "hash", params.BlockHash)
 			return beacon.PayloadStatusV1{Status: beacon.SYNCING}, nil
+		}
+		if errors.Is(err, downloader.InvalidParentErr) {
+			return beacon.PayloadStatusV1{Status: beacon.INVALID}, nil
 		}
 		// Either no beacon sync was started yet, or it rejected the delivered
 		// payload as non-integratable on top of the existing sync. We'll just
