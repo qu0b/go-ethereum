@@ -122,7 +122,7 @@ func (api *ConsensusAPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, pa
 		}
 		log.Info("Forkchoice requested sync to new head", "number", header.Number, "hash", header.Hash())
 		if err := api.eth.Downloader().BeaconSync(api.eth.SyncMode(), header); err != nil {
-			return beacon.STATUS_SYNCING, err
+			return beacon.ForkChoiceResponse{PayloadStatus: beacon.PayloadStatusV1{Status: beacon.INVALID, LatestValidHash: nil}}, err
 		}
 		return beacon.STATUS_SYNCING, nil
 	}
