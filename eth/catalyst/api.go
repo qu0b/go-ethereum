@@ -411,6 +411,8 @@ func (api *ConsensusAPI) setInvalidAncestor(invalid *types.Header, origin *types
 	api.invalidLock.Lock()
 	defer api.invalidLock.Unlock()
 
+	fmt.Printf("Marking block as bad: %v origin %v\n", invalid.Hash(), origin.Hash())
+
 	api.invalidTipsets[origin.Hash()] = invalid
 }
 
