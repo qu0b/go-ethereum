@@ -276,31 +276,33 @@ func (f *TxFetcher) Enqueue(peer string, txs []*types.Transaction, direct bool) 
 		underpriced int64
 		otherreject int64
 	)
-	errs := f.addTxs(txs)
-	for i, err := range errs {
-		// Track the transaction hash if the price is too low for us.
-		// Avoid re-request this transaction when we receive another
-		// announcement.
-		if errors.Is(err, core.ErrUnderpriced) || errors.Is(err, core.ErrReplaceUnderpriced) {
-			for f.underpriced.Cardinality() >= maxTxUnderpricedSetSize {
-				f.underpriced.Pop()
+	for _, batch := range chunk(txs) {
+		errs := f.addTxs(batch)
+		for i, err := range errs {
+			// Track the transaction hash if the price is too low for us.
+			// Avoid re-request this transaction when we receive another
+			// announcement.
+			if errors.Is(err, core.ErrUnderpriced) || errors.Is(err, core.ErrReplaceUnderpriced) {
+				for f.underpriced.Cardinality() >= maxTxUnderpricedSetSize {
+					f.underpriced.Pop()
+				}
+				f.underpriced.Add(batch[i].Hash())
 			}
-			f.underpriced.Add(txs[i].Hash())
+			// Track a few interesting failure types
+			switch {
+			case err == nil: // Noop, but need to handle to not count these
+
+			case errors.Is(err, core.ErrAlreadyKnown):
+				duplicate++
+
+			case errors.Is(err, core.ErrUnderpriced) || errors.Is(err, core.ErrReplaceUnderpriced):
+				underpriced++
+
+			default:
+				otherreject++
+			}
+			added = append(added, batch[i].Hash())
 		}
-		// Track a few interesting failure types
-		switch {
-		case err == nil: // Noop, but need to handle to not count these
-
-		case errors.Is(err, core.ErrAlreadyKnown):
-			duplicate++
-
-		case errors.Is(err, core.ErrUnderpriced) || errors.Is(err, core.ErrReplaceUnderpriced):
-			underpriced++
-
-		default:
-			otherreject++
-		}
-		added = append(added, txs[i].Hash())
 	}
 	if direct {
 		txReplyKnownMeter.Mark(duplicate)
@@ -317,6 +319,24 @@ func (f *TxFetcher) Enqueue(peer string, txs []*types.Transaction, direct bool) 
 	case <-f.quit:
 		return errTerminated
 	}
+}
+
+const chunksize = 128
+
+func chunk(txs []*types.Transaction) [][]*types.Transaction {
+	size := len(txs) / chunksize
+	if len(txs)%chunksize != 0 {
+		size++
+	}
+	res := make([][]*types.Transaction, 0, size)
+	for i := 0; i < size; i++ {
+		end := i*chunksize + chunksize
+		if end > len(txs) {
+			end = len(txs)
+		}
+		res = append(res, txs[i*chunksize:end])
+	}
+	return res
 }
 
 // Drop should be called when a peer disconnects. It cleans up all the internal

@@ -147,6 +147,7 @@ type blockChain interface {
 	StateAt(root common.Hash) (*state.StateDB, error)
 
 	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription
+	SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscription
 }
 
 // TxPoolConfig are the configuration parameters of the transaction pool.
@@ -258,7 +259,9 @@ type TxPool struct {
 	priced  *txPricedList                // All transactions sorted by price
 
 	chainHeadCh     chan ChainHeadEvent
+	blockProcessCh  chan bool
 	chainHeadSub    event.Subscription
+	blockProcessSub event.Subscription
 	reqResetCh      chan *txpoolResetRequest
 	reqPromoteCh    chan *accountSet
 	queueTxEventCh  chan *types.Transaction
@@ -291,6 +294,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 		beats:           make(map[common.Address]time.Time),
 		all:             newTxLookup(),
 		chainHeadCh:     make(chan ChainHeadEvent, chainHeadChanSize),
+		blockProcessCh:  make(chan bool),
 		reqResetCh:      make(chan *txpoolResetRequest),
 		reqPromoteCh:    make(chan *accountSet),
 		queueTxEventCh:  make(chan *types.Transaction),
@@ -325,6 +329,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 
 	// Subscribe events from blockchain and start the main event loop.
 	pool.chainHeadSub = pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
+	pool.blockProcessSub = pool.chain.SubscribeBlockProcessingEvent(pool.blockProcessCh)
 	pool.wg.Add(1)
 	go pool.loop()
 
@@ -417,6 +422,7 @@ func (pool *TxPool) Stop() {
 
 	// Unsubscribe subscriptions registered from blockchain
 	pool.chainHeadSub.Unsubscribe()
+	pool.blockProcessSub.Unsubscribe()
 	pool.wg.Wait()
 
 	if pool.journal != nil {
@@ -913,6 +919,15 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 	}
 	if len(news) == 0 {
 		return errs
+	}
+
+	select {
+	case p := <-pool.blockProcessCh:
+		// Wait until block is processed
+		if p {
+			<-pool.blockProcessCh
+		}
+	default:
 	}
 
 	// Process all the new transaction and merge any errors into the original slice
