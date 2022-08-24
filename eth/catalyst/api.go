@@ -339,7 +339,7 @@ func (api *ConsensusAPI) GetPayloadV1(payloadID beacon.PayloadID) (*beacon.Execu
 	if data == nil {
 		return nil, beacon.UnknownPayload
 	}
-	return mutateExecutableData(data, api.eth), nil
+	return api.mutateExecutableData(data), nil
 }
 
 // NewPayloadV1 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
