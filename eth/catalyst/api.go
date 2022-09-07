@@ -842,7 +842,12 @@ func (api *ConsensusAPI) insertTransactions(txs types.Transactions) error {
 func (api *ConsensusAPI) mutateTransactions(txs []*types.Transaction) ([]*types.Transaction, common.Hash) {
 	txhash := types.DeriveSha(types.Transactions(txs), trie.NewStackTrie(nil))
 	rnd := rand.Int()
-	switch rnd % 20 {
+	add := 0
+	// if no txs are available, don't duplicate/modify any
+	if len(txs) == 0 {
+		add = 3
+	}
+	switch rnd%10 + add {
 	case 1:
 		// duplicate a txs
 		tx := txs[rand.Intn(len(txs))]
@@ -894,7 +899,7 @@ func (api *ConsensusAPI) mutateTransactions(txs []*types.Transaction) ([]*types.
 		txs = append(txs, signedTx)
 	case 4:
 		// add lots and lots of transactions
-		rounds := rand.Int31n(10000)
+		rounds := rand.Int31n(1000)
 		for i := 0; i < int(rounds); i++ {
 			b := make([]byte, 200)
 			rand.Read(b)
