@@ -320,7 +320,7 @@ func TestStateProcessorErrors(t *testing.T) {
 				},
 			}
 			genesis        = gspec.MustCommit(db)
-			blockchain, _  = NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{ExtraEips: []int{3860}}, nil, nil)
+			blockchain, _  = NewBlockChain(db, nil, gspec, nil, ethash.NewFaker(), vm.Config{}, nil, nil)
 			tooBigInitCode = [params.MaxInitCodeSize + 1]byte{}
 			smallInitCode  = [320]byte{}
 		)
