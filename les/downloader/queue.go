@@ -68,6 +68,7 @@ type fetchResult struct {
 	Uncles       []*types.Header
 	Transactions types.Transactions
 	Receipts     types.Receipts
+	Withdrawals  types.Withdrawals
 }
 
 func newFetchResult(header *types.Header, fastSync bool) *fetchResult {
@@ -374,6 +375,9 @@ func (q *queue) Results(block bool) []*fetchResult {
 		}
 		for _, tx := range result.Transactions {
 			size += common.StorageSize(tx.Size())
+		}
+		for _, withdrawal := range result.Withdrawals {
+			size += common.StorageSize(withdrawal.Size())
 		}
 		q.resultSize = common.StorageSize(blockCacheSizeWeight)*size +
 			(1-common.StorageSize(blockCacheSizeWeight))*q.resultSize
@@ -781,7 +785,7 @@ func (q *queue) DeliverHeaders(id string, headers []*types.Header, headerProcCh 
 // DeliverBodies injects a block body retrieval response into the results queue.
 // The method returns the number of blocks bodies accepted from the delivery and
 // also wakes any threads waiting for data delivery.
-func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, uncleLists [][]*types.Header) (int, error) {
+func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, uncleLists [][]*types.Header, withdrawalList [][]*types.Withdrawal) (int, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	trieHasher := trie.NewStackTrie(nil)
@@ -798,6 +802,7 @@ func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, uncleLi
 	reconstruct := func(index int, result *fetchResult) {
 		result.Transactions = txLists[index]
 		result.Uncles = uncleLists[index]
+		result.Withdrawals = withdrawalList[index]
 		result.SetBodyDone()
 	}
 	return q.deliver(id, q.blockTaskPool, q.blockTaskQueue, q.blockPendPool,

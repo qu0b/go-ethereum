@@ -304,13 +304,15 @@ func XTestDelivery(t *testing.T) {
 				var emptyList []*types.Header
 				var txs [][]*types.Transaction
 				var uncles [][]*types.Header
+				var withdrawals [][]*types.Withdrawal
 				numToSkip := rand.Intn(len(f.Headers))
 				for _, hdr := range f.Headers[0 : len(f.Headers)-numToSkip] {
 					txs = append(txs, world.getTransactions(hdr.Number.Uint64()))
 					uncles = append(uncles, emptyList)
+					withdrawals = append(withdrawals, []*types.Withdrawal{})
 				}
 				time.Sleep(100 * time.Millisecond)
-				_, err := q.DeliverBodies(peer.id, txs, uncles)
+				_, err := q.DeliverBodies(peer.id, txs, uncles, withdrawals)
 				if err != nil {
 					fmt.Printf("delivered %d bodies %v\n", len(txs), err)
 				}

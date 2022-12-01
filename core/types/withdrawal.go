@@ -19,6 +19,7 @@ package types
 import (
 	"bytes"
 	"math/big"
+	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -34,6 +35,10 @@ type Withdrawal struct {
 	Validator uint64         `json:"validatorIndex"` // index of validator associated with withdrawal
 	Address   common.Address `json:"address"`        // target address for withdrawn ether
 	Amount    *big.Int       `json:"amount"`         // value of withdrawal in wei
+}
+
+func (w *Withdrawal) Size() common.StorageSize {
+	return common.StorageSize(unsafe.Sizeof(*w))
 }
 
 // field type overrides for gencodec
