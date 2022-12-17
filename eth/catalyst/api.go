@@ -375,8 +375,8 @@ func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableData) (beacon.Payl
 
 // NewPayloadV2 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
 func (api *ConsensusAPI) NewPayloadV2(params beacon.ExecutableData) (beacon.PayloadStatusV1, error) {
-	if params.Withdrawals == nil {
-		return api.invalid(fmt.Errorf("withdrawals required in V2"), nil), nil
+	if api.eth.BlockChain().Config().IsShanghai(new(big.Int).SetUint64(params.Timestamp)) && params.Withdrawals == nil {
+		return api.invalid(fmt.Errorf("withdrawals required post-shanghai"), nil), nil
 	}
 	return api.newPayload(params)
 }
