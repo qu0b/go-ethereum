@@ -368,13 +368,16 @@ func (api *ConsensusAPI) GetPayloadV2(payloadID beacon.PayloadID) (*beacon.Execu
 // NewPayloadV1 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
 func (api *ConsensusAPI) NewPayloadV1(params beacon.ExecutableData) (beacon.PayloadStatusV1, error) {
 	if params.Withdrawals != nil {
-		return beacon.PayloadStatusV1{Status: beacon.INVALID}, fmt.Errorf("withdrawals not supported in V1")
+		return api.invalid(fmt.Errorf("withdrawals not supported in V1"), nil), nil
 	}
 	return api.newPayload(params)
 }
 
 // NewPayloadV2 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
 func (api *ConsensusAPI) NewPayloadV2(params beacon.ExecutableData) (beacon.PayloadStatusV1, error) {
+	if params.Withdrawals == nil {
+		return api.invalid(fmt.Errorf("withdrawals required in V2"), nil), nil
+	}
 	return api.newPayload(params)
 }
 
