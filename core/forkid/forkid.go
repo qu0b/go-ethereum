@@ -213,14 +213,14 @@ func newFilter(config *params.ChainConfig, genesis common.Hash, headfn func() (u
 			return verify(i, head)
 		}
 		// Verify forks by time
-		for i := len(forks); i < len(forks)+len(forksByTime); i++ {
-			fork := forksByTime[i-len(forks)]
+		for i := 0; i < len(forksByTime); i++ {
+			fork := forksByTime[i]
 			// If our head is beyond this fork, continue to the next (we have a dummy
 			// fork of maxuint64 as the last item to always fail this check eventually).
 			if time >= fork {
 				continue
 			}
-			return verify(i, time)
+			return verify(len(forks)+i, time)
 		}
 
 		log.Error("Impossible fork ID validation", "id", id)
