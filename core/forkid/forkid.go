@@ -213,8 +213,7 @@ func newFilter(config *params.ChainConfig, genesis common.Hash, headfn func() (u
 			return verify(i, head)
 		}
 		// Verify forks by time
-		for i := 0; i < len(forksByTime); i++ {
-			fork := forksByTime[i]
+		for i, fork := range forksByTime {
 			// If our head is beyond this fork, continue to the next (we have a dummy
 			// fork of maxuint64 as the last item to always fail this check eventually).
 			if time >= fork {
