@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -306,8 +307,11 @@ func TestStateProcessorErrors(t *testing.T) {
 		}
 	}
 
-	// ErrMaxInitCodeSizeExceeded, for this we need extra EIP-3860 enabled.
+	// ErrMaxInitCodeSizeExceeded, for this we need Shanghai enabled.
 	{
+		config.TerminalTotalDifficultyPassed = true
+		config.TerminalTotalDifficulty = big.NewInt(0)
+		config.ShanghaiTime = big.NewInt(0)
 		var (
 			db    = rawdb.NewMemoryDatabase()
 			gspec = &Genesis{
@@ -318,9 +322,10 @@ func TestStateProcessorErrors(t *testing.T) {
 						Nonce:   0,
 					},
 				},
+				Timestamp: 1,
 			}
 			genesis        = gspec.MustCommit(db)
-			blockchain, _  = NewBlockChain(db, nil, gspec, nil, ethash.NewFaker(), vm.Config{ExtraEips: []int{3860}}, nil, nil)
+			blockchain, _  = NewBlockChain(db, nil, gspec, nil, beacon.New(ethash.NewFaker()), vm.Config{}, nil, nil)
 			tooBigInitCode = [params.MaxInitCodeSize + 1]byte{}
 			smallInitCode  = [320]byte{}
 		)
@@ -342,7 +347,7 @@ func TestStateProcessorErrors(t *testing.T) {
 				want: "could not apply tx 0 [0x39b7436cb432d3662a25626474282c5c4c1a213326fd87e4e18a91477bae98b2]: intrinsic gas too low: have 54299, want 54300",
 			},
 		} {
-			block := GenerateBadBlock(genesis, ethash.NewFaker(), tt.txs, gspec.Config)
+			block := GenerateBadBlock(genesis, beacon.New(ethash.NewFaker()), tt.txs, gspec.Config)
 			_, err := blockchain.InsertChain(types.Blocks{block})
 			if err == nil {
 				t.Fatal("block imported without errors")
@@ -375,6 +380,9 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 	if config.IsLondon(header.Number) {
 		header.BaseFee = misc.CalcBaseFee(config, parent.Header())
+	}
+	if config.IsShanghai(new(big.Int).SetUint64(header.Time)) {
+		header.WithdrawalsHash = &types.EmptyRootHash
 	}
 	var receipts []*types.Receipt
 	// The post-state result doesn't need to be correct (this is a bad block), but we do need something there

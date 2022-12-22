@@ -320,7 +320,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		sender           = vm.AccountRef(msg.From())
 		rules            = st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber, st.evm.Context.Random != nil, st.evm.Context.Time)
 		contractCreation = msg.To() == nil
-		eip3860          = st.evm.Config.HasEip3860()
+		eip3860          = rules.IsShanghai
 	)
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct

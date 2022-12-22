@@ -634,7 +634,7 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 		gas          = scope.Contract.Gas
 	)
 	// Check EIP-3860 initcode length.
-	if interpreter.cfg.HasEip3860() {
+	if interpreter.evm.chainRules.IsShanghai {
 		if size, overflow := size.Uint64WithOverflow(); overflow || size > params.MaxInitCodeSize {
 			scope.Stack.push(uint256.NewInt(0))
 			return nil, nil

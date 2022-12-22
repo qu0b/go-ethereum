@@ -134,13 +134,15 @@ func TestCreateGas(t *testing.T) {
 			CanTransfer: func(StateDB, common.Address, *big.Int) bool { return true },
 			Transfer:    func(StateDB, common.Address, common.Address, *big.Int) {},
 			BlockNumber: big.NewInt(0),
-		}
-		config := Config{}
-		if tt.eip3860 {
-			config.ExtraEips = []int{3860}
+			Time:        big.NewInt(1),
 		}
 
-		vmenv := NewEVM(vmctx, TxContext{}, statedb, params.AllEthashProtocolChanges, config)
+		chainconfig := *params.AllEthashProtocolChanges
+		if tt.eip3860 {
+			chainconfig.ShanghaiTime = big.NewInt(0)
+		}
+
+		vmenv := NewEVM(vmctx, TxContext{}, statedb, &chainconfig, Config{})
 
 		var startGas uint64 = math.MaxUint64
 		_, gas, err := vmenv.Call(AccountRef(common.Address{}), address, nil, startGas, new(big.Int))

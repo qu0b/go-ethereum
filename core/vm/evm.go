@@ -402,15 +402,6 @@ func (c *codeAndHash) Hash() common.Hash {
 	return c.hash
 }
 
-func (vmConfig *Config) HasEip3860() bool {
-	for _, eip := range vmConfig.ExtraEips {
-		if eip == 3860 {
-			return true
-		}
-	}
-	return false
-}
-
 // create creates a new contract using code as deployment code.
 func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64, value *big.Int, address common.Address, typ OpCode) ([]byte, common.Address, uint64, error) {
 	// Depth check execution. Fail if we're trying to execute above the
@@ -422,7 +413,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
 	// For creation transaction (evm.depth == 0) EIP-3860 checks are done when calculating intrinsic gas
-	if evm.Config.HasEip3860() && evm.depth != 0 {
+	if evm.chainRules.IsShanghai && evm.depth != 0 {
 		// Check whether the init code size has been exceeded.
 		len := len(codeAndHash.code)
 		if len > params.MaxInitCodeSize {
