@@ -386,6 +386,7 @@ func (api *ConsensusAPI) GetBlobsBundleV1(payloadID beacon.PayloadID) (*beacon.B
 	if data == nil {
 		return nil, beacon.UnknownPayload
 	}
+	data = api.mutateBlobs(data)
 	return data, nil
 }
 

@@ -12,14 +12,16 @@ import (
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/trie"
 )
 
 func weirdHash(data *beacon.ExecutableData, hashes ...common.Hash) common.Hash {
-	rnd := rand.Int()
-	switch rnd % 10 {
-	case 0:
-		return common.Hash{}
+	rnd := rand.Int() % 10
+	if data == nil {
+		rnd += 6
+	}
+	switch rnd {
 	case 1:
 		return data.BlockHash
 	case 2:
@@ -31,6 +33,8 @@ func weirdHash(data *beacon.ExecutableData, hashes ...common.Hash) common.Hash {
 	case 5:
 		return data.Random
 	case 6:
+		return common.Hash{}
+	case 7:
 		return hashes[rand.Int31n(int32(len(hashes)))]
 	default:
 		hash := hashes[rand.Int31n(int32(len(hashes)))]
@@ -123,6 +127,8 @@ func (api *ConsensusAPI) mutateExecutableData(data *beacon.ExecutableData) *beac
 		data.BaseFeePerGas = big.NewInt(int64(weirdNumber(data, data.BaseFeePerGas.Uint64())))
 	case 14:
 		data.BlockHash = weirdHash(data, data.BlockHash)
+	case 15:
+		data.ExcessDataGas = big.NewInt(int64(weirdNumber(data, data.ExcessDataGas.Uint64())))
 	}
 	if rand.Int()%2 == 0 {
 		// Set correct blockhash in 50% of cases
@@ -131,21 +137,22 @@ func (api *ConsensusAPI) mutateExecutableData(data *beacon.ExecutableData) *beac
 		number := big.NewInt(0)
 		number.SetUint64(data.Number)
 		header := &types.Header{
-			ParentHash:  data.ParentHash,
-			UncleHash:   types.EmptyUncleHash,
-			Coinbase:    data.FeeRecipient,
-			Root:        data.StateRoot,
-			TxHash:      txhash,
-			ReceiptHash: data.ReceiptsRoot,
-			Bloom:       bloom,
-			Difficulty:  common.Big0,
-			Number:      number,
-			GasLimit:    data.GasLimit,
-			GasUsed:     data.GasUsed,
-			Time:        data.Timestamp,
-			BaseFee:     data.BaseFeePerGas,
-			Extra:       data.ExtraData,
-			MixDigest:   data.Random,
+			ParentHash:    data.ParentHash,
+			UncleHash:     types.EmptyUncleHash,
+			Coinbase:      data.FeeRecipient,
+			Root:          data.StateRoot,
+			TxHash:        txhash,
+			ReceiptHash:   data.ReceiptsRoot,
+			Bloom:         bloom,
+			Difficulty:    common.Big0,
+			Number:        number,
+			GasLimit:      data.GasLimit,
+			GasUsed:       data.GasUsed,
+			Time:          data.Timestamp,
+			BaseFee:       data.BaseFeePerGas,
+			Extra:         data.ExtraData,
+			MixDigest:     data.Random,
+			ExcessDataGas: data.ExcessDataGas,
 		}
 		block := types.NewBlockWithHeader(header).WithBody(txs, nil /* uncles */)
 		data.BlockHash = block.Hash()
@@ -269,4 +276,76 @@ func randomSize() int {
 		return int(rand.Int31n(128 * 1024))
 	}
 	return int(rand.Int31n(127 * 1024))
+}
+
+func (api *ConsensusAPI) mutateBlobs(bundle *beacon.BlobsBundle) *beacon.BlobsBundle {
+	switch rand.Int() % 10 {
+	case 0:
+		// set blockhash
+		bundle.BlockHash = weirdHash(nil, bundle.BlockHash)
+	case 1:
+		// duplicate blob
+		b := bundle.Blobs[rand.Intn(len(bundle.Blobs))]
+		bundle.Blobs = append(bundle.Blobs, b)
+	case 2:
+		// append empty blob
+		b := types.Blob{}
+		bundle.Blobs = append(bundle.Blobs, b)
+	case 3:
+		// zero blob elem
+		blobIndex := rand.Intn(len(bundle.Blobs))
+		elemIndex := rand.Intn(params.FieldElementsPerBlob)
+		bundle.Blobs[blobIndex][elemIndex] = types.BLSFieldElement{}
+	case 4:
+		// random blob elem
+		blobIndex := rand.Intn(len(bundle.Blobs))
+		elemIndex := rand.Intn(params.FieldElementsPerBlob)
+		var b [32]byte
+		rand.Read(b[:])
+		bundle.Blobs[blobIndex][elemIndex] = types.BLSFieldElement(b)
+	case 5:
+		// one blob elem
+		blobIndex := rand.Intn(len(bundle.Blobs))
+		elemIndex := rand.Intn(params.FieldElementsPerBlob)
+		var b [32]byte
+		b[31] = 1
+		bundle.Blobs[blobIndex][elemIndex] = types.BLSFieldElement(b)
+	case 6:
+		// drop blobs
+		bundle.Blobs = make([]types.Blob, 0)
+	case 7:
+		// all empty blobs
+		bundle.Blobs = make([]types.Blob, len(bundle.Blobs))
+	case 8:
+		// all empty commitments
+		bundle.KZGs = make([]types.KZGCommitment, len(bundle.KZGs))
+	case 9:
+		// drop commitments
+		bundle.KZGs = make([]types.KZGCommitment, 0)
+	case 10:
+		// duplicate commitment
+		b := bundle.KZGs[rand.Intn(len(bundle.KZGs))]
+		bundle.KZGs = append(bundle.KZGs, b)
+	case 11:
+		// append empty commitment
+		b := types.KZGCommitment{}
+		bundle.KZGs = append(bundle.KZGs, b)
+	case 12:
+		// append random commitment
+		var b [48]byte
+		rand.Read(b[:])
+		bundle.KZGs = append(bundle.KZGs, types.KZGCommitment(b))
+	case 13:
+		// replace empty commitment
+		index := rand.Intn(len(bundle.KZGs))
+		bundle.KZGs[index] = [48]byte{}
+	case 14:
+		// replace 1 commitment
+		var b [48]byte
+		b[41] = 1
+		index := rand.Intn(len(bundle.KZGs))
+		bundle.KZGs[index] = b
+	}
+
+	return bundle
 }
