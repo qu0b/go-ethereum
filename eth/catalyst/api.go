@@ -372,6 +372,7 @@ func (api *ConsensusAPI) GetPayloadV3(payloadID beacon.PayloadID) (*beacon.Execu
 	if err != nil {
 		return nil, err
 	}
+	data.ExecutionPayload = api.mutateExecutableData(data.ExecutionPayload)
 	return data, nil
 }
 
