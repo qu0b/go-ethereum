@@ -130,24 +130,27 @@ func (api *ConsensusAPI) mutateExecutableData(data *beacon.ExecutableData) *beac
 		txs, txhash := api.mutateTransactions(txs)
 		number := big.NewInt(0)
 		number.SetUint64(data.Number)
+		withdrawals, withdrawalHash := api.mutateWithdrawals(data.Withdrawals)
 		header := &types.Header{
-			ParentHash:  data.ParentHash,
-			UncleHash:   types.EmptyUncleHash,
-			Coinbase:    data.FeeRecipient,
-			Root:        data.StateRoot,
-			TxHash:      txhash,
-			ReceiptHash: data.ReceiptsRoot,
-			Bloom:       bloom,
-			Difficulty:  common.Big0,
-			Number:      number,
-			GasLimit:    data.GasLimit,
-			GasUsed:     data.GasUsed,
-			Time:        data.Timestamp,
-			BaseFee:     data.BaseFeePerGas,
-			Extra:       data.ExtraData,
-			MixDigest:   data.Random,
+			ParentHash:      data.ParentHash,
+			UncleHash:       types.EmptyUncleHash,
+			Coinbase:        data.FeeRecipient,
+			Root:            data.StateRoot,
+			TxHash:          txhash,
+			ReceiptHash:     data.ReceiptsRoot,
+			Bloom:           bloom,
+			Difficulty:      common.Big0,
+			Number:          number,
+			GasLimit:        data.GasLimit,
+			GasUsed:         data.GasUsed,
+			Time:            data.Timestamp,
+			BaseFee:         data.BaseFeePerGas,
+			Extra:           data.ExtraData,
+			MixDigest:       data.Random,
+			WithdrawalsHash: withdrawalHash,
 		}
 		block := types.NewBlockWithHeader(header).WithBody(txs, nil /* uncles */)
+		block.WithWithdrawals(withdrawals)
 		data.BlockHash = block.Hash()
 	}
 	return data
@@ -164,12 +167,68 @@ func decodeTx(enc [][]byte) ([]*types.Transaction, error) {
 	return txs, nil
 }
 
-// Used in tests to add a the list of transactions from a block to the tx pool.
-func (api *ConsensusAPI) insertTransactions(txs types.Transactions) error {
-	for _, tx := range txs {
-		api.eth.TxPool().AddLocal(tx)
+func (api *ConsensusAPI) mutateWithdrawals(withdrawals []*types.Withdrawal) ([]*types.Withdrawal, *common.Hash) {
+	var withdrawalHash *common.Hash
+	w := types.DeriveSha(types.Withdrawals(withdrawals), trie.NewStackTrie(nil))
+	withdrawalHash = &w
+	rnd := rand.Int()
+	switch rnd % 10 {
+	case 1:
+		// duplicate a withdrawal
+		w := withdrawals[rand.Intn(len(withdrawals))]
+		withdrawals = append(withdrawals, w)
+	case 2:
+		// replace a withdrawal
+		index := rand.Intn(len(withdrawals))
+		b := make([]byte, 32)
+		rand.Read(b)
+		w := types.Withdrawal{
+			Index:     rand.Uint64(),
+			Validator: rand.Uint64(),
+			Address:   common.BytesToAddress(b),
+			Amount:    rand.Uint64(),
+		}
+		withdrawals[index] = &w
+	case 3:
+		// modify a withdrawal
+		w := withdrawals[rand.Intn(len(withdrawals))]
+		field := rand.Int()
+		switch field % 4 {
+		case 0:
+			w.Index = rand.Uint64()
+		case 1:
+			w.Validator = rand.Uint64()
+		case 2:
+			w.Amount = rand.Uint64()
+		case 3:
+			b := make([]byte, 32)
+			rand.Read(b)
+			w.Address = common.BytesToAddress(b)
+		}
 	}
-	return nil
+
+	if rand.Int()%20 > 17 {
+		// Recompute correct txhash in most cases
+		w = types.DeriveSha(types.Withdrawals(withdrawals), trie.NewStackTrie(nil))
+		withdrawalHash = &w
+	} else {
+		switch rand.Int() % 5 {
+		case 0:
+			withdrawalHash = nil
+		case 1:
+			withdrawalHash = &types.EmptyRootHash
+		case 2:
+			withdrawalHash = &types.EmptyUncleHash
+		case 3:
+			withdrawalHash = &common.Hash{}
+		case 4:
+			b := make([]byte, 32)
+			rand.Read(b)
+			w := common.BytesToHash(b)
+			withdrawalHash = &w
+		}
+	}
+	return withdrawals, withdrawalHash
 }
 
 func (api *ConsensusAPI) mutateTransactions(txs []*types.Transaction) ([]*types.Transaction, common.Hash) {
@@ -180,7 +239,7 @@ func (api *ConsensusAPI) mutateTransactions(txs []*types.Transaction) ([]*types.
 	if len(txs) == 0 {
 		add = 3
 	}
-	switch rnd%10 + add {
+	switch rnd%20 + add {
 	case 1:
 		// duplicate a txs
 		tx := txs[rand.Intn(len(txs))]
