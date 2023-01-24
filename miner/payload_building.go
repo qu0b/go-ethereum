@@ -49,6 +49,14 @@ func (args *BuildPayloadArgs) Id() beacon.PayloadID {
 	binary.Write(hasher, binary.BigEndian, args.Timestamp)
 	hasher.Write(args.Random[:])
 	hasher.Write(args.FeeRecipient[:])
+	if args.Withdrawals != nil {
+		for _, w := range args.Withdrawals {
+			binary.Write(hasher, binary.BigEndian, w.Index)
+			binary.Write(hasher, binary.BigEndian, w.Validator)
+			hasher.Write(w.Address[:])
+			binary.Write(hasher, binary.BigEndian, w.Amount)
+		}
+	}
 	var out beacon.PayloadID
 	copy(out[:], hasher.Sum(nil)[:8])
 	return out
