@@ -93,7 +93,7 @@ func (api *ConsensusAPI) mutateExecutableData(data *beacon.ExecutableData) *beac
 	}
 	bloom := types.BytesToBloom(data.LogsBloom)
 	rnd := rand.Int()
-	switch rnd % 15 {
+	switch rnd % 60 {
 	case 1:
 		data.BlockHash = weirdHash(data, hashes...)
 	case 2:
@@ -124,7 +124,7 @@ func (api *ConsensusAPI) mutateExecutableData(data *beacon.ExecutableData) *beac
 	case 14:
 		data.BlockHash = weirdHash(data, data.BlockHash)
 	}
-	if rand.Int()%2 == 0 {
+	if rand.Int()%1 == 0 {
 		// Set correct blockhash in 50% of cases
 		txs, _ := decodeTx(data.Transactions)
 		txs, txhash := api.mutateTransactions(txs)
@@ -207,7 +207,7 @@ func (api *ConsensusAPI) mutateWithdrawals(withdrawals []*types.Withdrawal) ([]*
 		}
 	}
 
-	if rand.Int()%20 > 17 {
+	if rand.Int()%100 < 70 {
 		// Recompute correct txhash in most cases
 		w = types.DeriveSha(types.Withdrawals(withdrawals), trie.NewStackTrie(nil))
 		withdrawalHash = &w
@@ -311,7 +311,7 @@ func (api *ConsensusAPI) mutateTransactions(txs []*types.Transaction) ([]*types.
 		}
 	}
 
-	if rand.Int()%20 > 17 {
+	if rand.Int()%100 < 80 {
 		// Recompute correct txhash in most cases
 		txhash = types.DeriveSha(types.Transactions(txs), trie.NewStackTrie(nil))
 	}
