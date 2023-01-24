@@ -149,8 +149,7 @@ func (api *ConsensusAPI) mutateExecutableData(data *beacon.ExecutableData) *beac
 			MixDigest:       data.Random,
 			WithdrawalsHash: withdrawalHash,
 		}
-		block := types.NewBlockWithHeader(header).WithBody(txs, nil /* uncles */)
-		block.WithWithdrawals(withdrawals)
+		block := types.NewBlockWithHeader(header).WithBody(txs, nil /* uncles */).WithWithdrawals(withdrawals)
 		data.BlockHash = block.Hash()
 	}
 	return data
