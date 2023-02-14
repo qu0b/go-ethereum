@@ -124,7 +124,7 @@ func (api *ConsensusAPI) mutateExecutableData(data *beacon.ExecutableData) *beac
 	case 14:
 		data.BlockHash = weirdHash(data, data.BlockHash)
 	}
-	if rand.Int()%1 == 0 {
+	if rand.Int()%2 == 0 {
 		// Set correct blockhash in 50% of cases
 		txs, _ := decodeTx(data.Transactions)
 		txs, txhash := api.mutateTransactions(txs)
@@ -170,6 +170,13 @@ func (api *ConsensusAPI) mutateWithdrawals(withdrawals []*types.Withdrawal) ([]*
 	var withdrawalHash *common.Hash
 	w := types.DeriveSha(types.Withdrawals(withdrawals), trie.NewStackTrie(nil))
 	withdrawalHash = &w
+	if len(withdrawals) == 0 {
+		b := make([]byte, 20)
+		rand.Read(b)
+		withdrawals = []*types.Withdrawal{
+			{Index: rand.Uint64(), Validator: rand.Uint64(), Address: common.BytesToAddress(b), Amount: rand.Uint64()},
+		}
+	}
 	rnd := rand.Int()
 	switch rnd % 10 {
 	case 1:
