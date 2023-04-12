@@ -149,6 +149,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		TxPool                  *txpool.Config
 		GPO                     *gasprice.Config
 		EnablePreimageRecording *bool
+		EnableSupplyDeltaRecording *bool
 		DocRoot                 *string `toml:"-"`
 		RPCGasCap               *uint64
 		RPCEVMTimeout           *time.Duration

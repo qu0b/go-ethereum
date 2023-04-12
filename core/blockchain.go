@@ -1815,9 +1815,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals, setHead bool)
 			status, err = bc.writeBlockAndSetHead(block, receipts, logs, statedb, false)
 		}
 		followupInterrupt.Store(true)
-		if _, err := bc.issuance(block, parent); err != nil {
-			log.Error("Failed to calculate Ether issuance: %v", err)
-		}
 		if err != nil {
 			return it.index, err
 		}

@@ -42,11 +42,21 @@ func SupplyDelta(block *types.Block, parent *types.Header, db *trie.Database, co
 	if block.ParentHash() != parent.Hash() {
 		return nil, fmt.Errorf("parent hash mismatch: have %s, want %s", block.ParentHash().Hex(), parent.Hash().Hex())
 	}
-	src, err := trie.New(common.Hash{}, parent.Root, db)
+	parentID := trie.ID{
+		StateRoot: parent.Root,
+		Owner:     common.Hash{},
+		Root:      parent.Root,
+	}
+	blockID := trie.ID{
+		StateRoot: parent.Root,
+		Owner:     common.Hash{},
+		Root:      parent.Root,
+	}
+	src, err := trie.New(&parentID, db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open source trie: %v", err)
 	}
-	dst, err := trie.New(common.Hash{}, block.Root(), db)
+	dst, err := trie.New(&blockID, db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open destination trie: %v", err)
 	}

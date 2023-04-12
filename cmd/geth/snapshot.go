@@ -29,7 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/state/pruner"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
-	"github.com/ethereum/go-ethereum/core/supplydelta"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/internal/flags"
@@ -617,14 +616,17 @@ func crawlSupply(ctx *cli.Context) error {
 		log.Error("Too many arguments given")
 		return errors.New("too many arguments")
 	}
-	snaptree, err := snapshot.New(chaindb, trie.NewDatabase(chaindb), 256, headBlock.Root(), false, false, false)
-	if err != nil {
-		log.Error("Failed to open snapshot tree", "err", err)
-		return err
-	}
-	if _, err = supplydelta.Supply(headBlock.Header(), snaptree); err != nil {
-		log.Error("Failed to calculate current supply", "err", err)
-		return err
-	}
+	/*
+		snaptree, err := snapshot.New(chaindb, trie.NewDatabase(chaindb), 256, headBlock.Root(), false, false, false)
+		if err != nil {
+			log.Error("Failed to open snapshot tree", "err", err)
+			return err
+		}
+		if _, err = supplydelta.Supply(headBlock.Header(), snaptree); err != nil {
+			log.Error("Failed to calculate current supply", "err", err)
+			return err
+		}
+		return nil
+	*/
 	return nil
 }
