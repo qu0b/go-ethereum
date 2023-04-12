@@ -83,7 +83,7 @@ func SupplyDelta(block *types.Block, parent *types.Header, db *trie.Database, co
 		supplyDelta.Sub(supplyDelta, acc.Balance)
 	}
 	// Calculate the block fixedReward based on chain rules and progression.
-	fixedReward, unclesReward, burn := Subsidy(block, config)
+	fixedReward, unclesReward, burn, withdrawals := Subsidy(block, config)
 
 	// Calculate the difference between the "calculated" and "crawled" supply
 	// delta.
@@ -92,7 +92,7 @@ func SupplyDelta(block *types.Block, parent *types.Header, db *trie.Database, co
 	diff.Sub(diff, unclesReward)
 	diff.Add(diff, burn)
 
-	log.Info("Calculated supply delta for block", "number", block.Number(), "hash", block.Hash(), "supplydelta", supplyDelta, "fixedreward", fixedReward, "unclesreward", unclesReward, "burn", burn, "diff", diff, "elapsed", time.Since(start))
+	log.Info("Calculated supply delta for block", "number", block.Number(), "hash", block.Hash(), "supplydelta", supplyDelta, "fixedreward", fixedReward, "unclesreward", unclesReward, "burn", burn, "withdrawals", withdrawals, "diff", diff, "elapsed", time.Since(start))
 	return supplyDelta, nil
 }
 
@@ -100,10 +100,11 @@ func SupplyDelta(block *types.Block, parent *types.Header, db *trie.Database, co
 // 1559 burn solely based on header fields. This method is a very accurate
 // approximation of the true supply delta, but cannot take into account Ether
 // burns via selfdestructs, so it will always be ever so slightly off.
-func Subsidy(block *types.Block, config *params.ChainConfig) (fixedReward *big.Int, unclesReward *big.Int, burn *big.Int) {
+func Subsidy(block *types.Block, config *params.ChainConfig) (fixedReward *big.Int, unclesReward *big.Int, burn *big.Int, withdrawals *big.Int) {
 	// Calculate the block rewards based on chain rules and progression.
 	fixedReward = new(big.Int)
 	unclesReward = new(big.Int)
+	withdrawals = new(big.Int)
 
 	// Select the correct block reward based on chain progression.
 	if config.Ethash != nil {
@@ -140,7 +141,12 @@ func Subsidy(block *types.Block, config *params.ChainConfig) (fixedReward *big.I
 	if block.BaseFee() != nil {
 		burn = new(big.Int).Mul(new(big.Int).SetUint64(block.GasUsed()), block.BaseFee())
 	}
-	return fixedReward, unclesReward, burn
+
+	for _, w := range block.Withdrawals() {
+		withdrawals.Add(withdrawals, big.NewInt(int64(w.Amount)))
+	}
+
+	return fixedReward, unclesReward, burn, withdrawals
 }
 
 // Supply crawls the state snapshot at a given header and gatheres all the account

@@ -103,7 +103,8 @@ func (api *EthereumAPI) SupplyDelta(ctx context.Context, from uint64) (*rpc.Subs
 		crawled := rawdb.ReadSupplyDelta(api.e.chainDb, block.NumberU64(), block.Hash())
 
 		// Calculate the subsidy from the block's contents
-		fixedReward, unclesReward, burn := supplydelta.Subsidy(block, config)
+		fixedReward, unclesReward, burn, withdrawals := supplydelta.Subsidy(block, config)
+		_ = withdrawals
 
 		// Calculate the difference between the "calculated" and "crawled" supply delta
 		var diff *big.Int
