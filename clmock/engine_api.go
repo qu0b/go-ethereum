@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"net/http"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -26,7 +28,7 @@ func (e *engineAPI) Connect(ctx context.Context, httpEndpoint string) error {
 	e.client = client
 }
 
-func (e *engineAPI) ForkchoiceUpdatedV1(fcState engine.ForkChoiceStateV1, payloadAttr engine.PayloadAttributes) (*ForkChoiceState, error) {
+func (e *engineAPI) ForkchoiceUpdatedV1(fcState *engine.ForkchoiceStateV1, payloadAttr *engine.PayloadAttributes) (*engine.ForkchoiceStateV1, error) {
 	var resp engine.ForkChoiceResponse
 	if err := client.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV1", fcState, payloadAttr); err != nil {
 		return nil, err
