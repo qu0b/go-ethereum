@@ -1,5 +1,10 @@
 package clmock
 
+import (
+	"time"
+	"github.com/ethereum/go-ethereum/beacon/engine"
+)
+
 type CLMock struct {
 	ctx context.Context
 }
@@ -61,16 +66,17 @@ func (c *CLMock) clmockLoop() {
 
 				// spin a bit until the payload is built
 				for {
-				select {
-				case _ := <-buildTicker.C:
-					// try and get the payload
-					payload, err := engine_api.GetPayloadV1(fcState.PayloadID)
-					if err != nil {
-						// TODO: if err is that the payload is still building, continue spinning
-						panic(err)
+					select {
+					case _ := <-buildTicker.C:
+						// try and get the payload
+						payload, err := engine_api.GetPayloadV1(fcState.PayloadID)
+						if err != nil {
+							// TODO: if err is that the payload is still building, continue spinning
+							panic(err)
+						}
+					case _ := <-c.ctx.Done():
+						return
 					}
-				case _ := <-c.ctx.Done():
-					return
 				}
 
 /*
@@ -100,6 +106,8 @@ func (c *CLMock) clmockLoop() {
 	}
 }
 
+/*
 func (c *CLMock) Stop() {
 	c.ctx.Cancel()
 }
+*/
