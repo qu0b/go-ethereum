@@ -24,6 +24,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/clmock"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -525,7 +526,7 @@ func (s *Ethereum) Stop() error {
 	s.miner.Close()
 	s.blockchain.Stop()
 	s.engine.Close()
-	s.clmock.Close()
+	s.clmock.Stop()
 
 	// Clean shutdown marker as the last thing before closing db
 	s.shutdownTracker.Stop()

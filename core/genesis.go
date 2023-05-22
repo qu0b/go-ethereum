@@ -25,7 +25,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/clmock"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"

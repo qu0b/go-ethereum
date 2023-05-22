@@ -9,10 +9,17 @@ import (
 
 type CLMock struct {
 	ctx context.Context
+	cancel context.CancelFunc
 }
 
 func (c *CLMock) Start() {
+	c.ctx, c.cancel = context.WithCancel(context.Background())
 	go c.clmockLoop()
+}
+
+func (c * CLMock) Stop() {
+	c.ctx.Done()
+	c.cancel()
 }
 
 // TODO: use ctx with timeout when calling rpc methods? is there a way they could hang indefinitely (even though we are calling on same machine/process)?
