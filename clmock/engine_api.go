@@ -2,7 +2,6 @@ package clmock
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"net/http"
@@ -24,38 +23,46 @@ func (e *engineAPI) Connect(ctx context.Context, httpEndpoint string) error {
 	if err != nil {
 		return err
 	}
-
 	e.client = client
+	return nil
 }
 
-func (e *engineAPI) ForkchoiceUpdatedV1(fcState *engine.ForkchoiceStateV1, payloadAttr *engine.PayloadAttributes) (*engine.ForkchoiceStateV1, error) {
+func (e *engineAPI) ForkchoiceUpdatedV1(ctx context.Context, fcState *engine.ForkchoiceStateV1, payloadAttr *engine.PayloadAttributes) (*engine.ForkChoiceResponse, error) {
 	var resp engine.ForkChoiceResponse
-	if err := client.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV1", fcState, payloadAttr); err != nil {
+	if err := e.client.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV1", fcState, payloadAttr); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (e *engineAPI) GetPayloadV1(id engine.PayloadID) (*engine.ExecutionPayloadBodyV1, error) {
-	var res engine.ExecutionPayloadBodyV1
-	if err := client.CallContext(ctx, &res, "engine_getPayloadV1", id); err != nil {
+func (e *engineAPI) GetPayloadV1(ctx context.Context, id *engine.PayloadID) (*engine.ExecutableData, error) {
+	var res *engine.ExecutableData
+	if err := e.client.CallContext(ctx, &res, "engine_getPayloadV1", id); err != nil {
 		return nil, err
 	}
-
 	return res, nil
 }
 
-func (e* engineAPI) NewPayloadV1(payload *engine.ExecutionPayloadBodyV1) error {
-	if err := client.CallContext(ctx, &res, "engine_newPayloadV1", payload); err != nil {
+func (e *engineAPI) NewPayloadV1(ctx context.Context, payload *engine.ExecutableData) error {
+	var res *engine.PayloadStatusV1
+	if err := e.client.CallContext(ctx, &res, "engine_newPayloadV1", payload); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (e *engineAPI) GetHeaderByNumber(number uint64) (*types.Header, error) {
-	var header types.Header
-	if err := client.CallContext(ctx, &header, "eth_getBlockByNumber", number); err != nil {
+func (e *engineAPI) GetHeaderByTag(ctx context.Context, tag string) (*types.Header, error) {
+	var header *types.Header
+	if err := e.client.CallContext(ctx, &header, "eth_getBlockByNumber", tag); err != nil {
 		return nil, err
 	}
-	return &header, nil
+	return header, nil
+}
+
+func (e *engineAPI) GetHeaderByNumber(ctx context.Context, number uint64) (*types.Header, error) {
+	var header *types.Header
+	if err := e.client.CallContext(ctx, &header, "eth_getBlockByNumber", number); err != nil {
+		return nil, err
+	}
+	return header, nil
 }

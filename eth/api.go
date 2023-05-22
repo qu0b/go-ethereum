@@ -410,8 +410,15 @@ type storageEntry struct {
 
 // StorageRangeAt returns the storage at the given block height and transaction index.
 func (api *DebugAPI) StorageRangeAt(ctx context.Context, blockHash common.Hash, txIndex int, contractAddress common.Address, keyStart hexutil.Bytes, maxResult int) (StorageRangeResult, error) {
-	// Retrieve the block
-	block := api.eth.blockchain.GetBlockByHash(blockHash)
+	var block *types.Block
+	if number, ok := blockNrOrHash.Number(); ok {
+		block := api.eth.blockchain.GetBlockByNumber(number)
+	} else if hash, ok := blockNrOrHash.Hash(); ok {
+		block := api.eth.blockchain.GetBlockByHash(hash)
+	} else {
+		return nil, errors.New("either block number or block hash must be specified")
+	}
+
 	if block == nil {
 		return StorageRangeResult{}, fmt.Errorf("block %#x not found", blockHash)
 	}

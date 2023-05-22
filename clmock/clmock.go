@@ -15,6 +15,8 @@ func (c *CLMock) Start() {
 	go c.clmockLoop()
 }
 
+// TODO: use ctx with timeout when calling rpc methods? is there a way they could hang indefinitely (even though we are calling on same machine/process)?
+
 func (c *CLMock) clmockLoop() {
 	ticker := time.NewTicker(time.Millisecond * 500)
 	blockPeriod := time.Second * 12
@@ -29,12 +31,12 @@ func (c *CLMock) clmockLoop() {
 		panic(err)
 	}
 
-	header, err := engine_api.GetHeaderByNumber(0)
+	header, err := engine_api.GetHeaderByNumber(c.ctx, 0)
 	if err != nil {
 		panic(err)
 	}
 
-	_, err = engine_api.ForkchoiceUpdatedV1(&engine.ForkchoiceStateV1{
+	_, err = engine_api.ForkchoiceUpdatedV1(c.ctx, &engine.ForkchoiceStateV1{
 		HeadBlockHash: header.Hash(),
 		SafeBlockHash: header.Hash(),
 		FinalizedBlockHash: header.Hash(),
@@ -52,8 +54,17 @@ func (c *CLMock) clmockLoop() {
 			if curTime.After(lastBlockTime.Add(blockPeriod)) {
 				// get the current head and populate curForkchoiceState
 
+				safeHead, err := engine_api.GetHeaderByTag(c.ctx, "safe")
+				if err != nil {
+					panic(err)
+				}
+				finalizedHead, err := engine_api.GetHeaderByTag(c.ctx, "finalized")
+				if err != nil {
+					panic(err)
+				}
+
 				// send forkchoiceupdated (to trigger block building)
-				fcState, err := engine_api.ForkchoiceUpdatedV1(curForkchoiceState, &engine.PayloadAttributes{
+				fcState, err := engine_api.ForkchoiceUpdatedV1(c.ctx, curForkchoiceState, &engine.PayloadAttributes{
 					Timestamp: uint64(curTime.Unix()), // TODO make sure conversion from int64->uint64 is okay here (should be fine)
 					Random: prevRandaoVal,
 					SuggestedFeeRecipient: suggestedFeeRecipient,
@@ -72,12 +83,12 @@ func (c *CLMock) clmockLoop() {
 					select {
 					case _ = <-buildTicker.C:
 						// try and get the payload
-						payload, err = engine_api.GetPayloadV1(fcState.PayloadID)
+						payload, err = engine_api.GetPayloadV1(c.ctx, fcState.PayloadID)
 						if err != nil {
 							// TODO: if err is that the payload is still building, continue spinning
 							panic(err)
 						}
-					case _ := <-c.ctx.Done():
+					case _ = <-c.ctx.Done():
 						return
 					}
 				}
@@ -91,15 +102,15 @@ func (c *CLMock) clmockLoop() {
 */
 
 				// mark the payload as canon
-				if err = engine_api.NewPayloadV1(payload); err != nil {
+				if err = engine_api.NewPayloadV1(c.ctx, payload); err != nil {
 					panic(err)
 				}
 
 				// send Forkchoiceupdated (if the payload had transactions)
-				_, err = engine_api.ForkChoiceUpdatedV1(engine.ForkChoiceStateV1{
+				_, err = engine_api.ForkchoiceUpdatedV1(c.ctx, &engine.ForkchoiceStateV1{
 					HeadBlockHash: payload.BlockHash,
-					SafeBlockHash: fcState.Safe.Hash,
-					FinalizedBlockHash: fcState.Finalized.Hash,
+					SafeBlockHash: safeHead.Hash(),
+					FinalizedBlockHash: finalizedHead.Hash(),
 				}, nil)
 				if err != nil {
 					panic(err)
