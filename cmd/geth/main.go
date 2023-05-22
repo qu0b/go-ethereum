@@ -429,7 +429,11 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 	}
 
 	if ctx.Bool(utils.DeveloperFlag.Name) {
-		// TODO start engine-api as well
+		ethBackend, ok := backend.(*eth.EthAPIBackend)
+		if !ok {
+			utils.Fatalf("Ethereum service not running")
+		}
+		// TODO start engine-api as well (instead of having to specify the flags manually)
 		ethBackend.StartCLMock()
 	}
 }
