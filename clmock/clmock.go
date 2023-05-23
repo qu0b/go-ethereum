@@ -27,7 +27,7 @@ func (c * CLMock) Stop() {
 
 func (c *CLMock) clmockLoop() {
 	ticker := time.NewTicker(time.Millisecond * 500)
-	blockPeriod := time.Second * 1
+	blockPeriod := time.Second * 2
 	lastBlockTime := time.Now()
 
 	var curForkchoiceState *engine.ForkchoiceStateV1
@@ -63,7 +63,7 @@ func (c *CLMock) clmockLoop() {
 		case _ = <-c.ctx.Done():
 			break
 		case curTime := <-ticker.C:
-			fmt.Println("pretick")
+			fmt.Printf("pretick %d\n", curTime)
 			if curTime.After(lastBlockTime.Add(blockPeriod)) {
 				// get the current head and populate curForkchoiceState
 				fmt.Println("tick")
@@ -96,6 +96,7 @@ func (c *CLMock) clmockLoop() {
 				buildTicker := time.NewTicker(100 * time.Millisecond)
 				// spin a bit until the payload is built
 				for {
+					var done bool
 					select {
 					case _ = <-buildTicker.C:
 						// try and get the payload
@@ -104,33 +105,35 @@ func (c *CLMock) clmockLoop() {
 							// TODO: if err is that the payload is still building, continue spinning
 							panic(err)
 						}
+						done = true
+						break
 					case _ = <-c.ctx.Done():
 						return
 					}
+					if done {
+						break
+					}
 				}
 
-/*
-				// short-circuit if the payload didn't have transactions
-				if len(payload.Transactions) == 0 {
-					// TODO: more intelligent handling here
-					continue
-				}
-*/
-
+				fmt.Println("marking payload as canon")
 				// mark the payload as canon
 				if err = engine_api.NewPayloadV1(c.ctx, payload); err != nil {
 					panic(err)
 				}
 
-				// send Forkchoiceupdated (if the payload had transactions)
-				_, err = engine_api.ForkchoiceUpdatedV1(c.ctx, &engine.ForkchoiceStateV1{
+				newForkchoiceState := &engine.ForkchoiceStateV1{
 					HeadBlockHash: payload.BlockHash,
 					SafeBlockHash: safeHead.Hash(),
 					FinalizedBlockHash: finalizedHead.Hash(),
-				}, nil)
+				}
+
+				// send Forkchoiceupdated (TODO: only if the payload had transactions)
+				_, err = engine_api.ForkchoiceUpdatedV1(c.ctx, newForkchoiceState, nil)
 				if err != nil {
 					panic(err)
 				}
+				lastBlockTime = time.Now()
+				curForkchoiceState = newForkchoiceState
 			}
 		}
 	}
