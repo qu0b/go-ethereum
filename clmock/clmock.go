@@ -2,10 +2,10 @@ package clmock
 
 import (
 	"context"
-	"fmt"
 	"time"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 type CLMock struct {
@@ -36,15 +36,13 @@ func (c *CLMock) clmockLoop() {
 
 	engine_api := engineAPI{}
 	if err := engine_api.Connect(c.ctx, "http://127.0.0.1:8545"); err != nil {
-		panic(err)
+		log.Error("failed to connect to engine api: %v", err)
 	}
 
 	header, err := engine_api.GetHeaderByNumber(c.ctx, 0)
 	if err != nil {
-		panic(err)
+		log.Error("failed to get genesis block header", err)
 	}
-
-	fmt.Printf("genesis header %x\n", header.Hash())
 
 	curForkchoiceState = &engine.ForkchoiceStateV1{
 		HeadBlockHash: header.Hash(),
@@ -55,7 +53,7 @@ func (c *CLMock) clmockLoop() {
 	_, err = engine_api.ForkchoiceUpdatedV1(c.ctx, curForkchoiceState, nil)
 
 	if err != nil {
-		panic(err)
+		log.Error("failed to initiate PoS transition for genesis via Forkchoiceupdated", err)
 	}
 
 	for {
@@ -63,18 +61,16 @@ func (c *CLMock) clmockLoop() {
 		case _ = <-c.ctx.Done():
 			break
 		case curTime := <-ticker.C:
-			fmt.Printf("pretick %d\n", curTime)
 			if curTime.After(lastBlockTime.Add(blockPeriod)) {
 				// get the current head and populate curForkchoiceState
-				fmt.Println("tick")
 
 				safeHead, err := engine_api.GetHeaderByTag(c.ctx, "safe")
 				if err != nil {
-					panic(err)
+					log.Error("failed to get safe header", err)
 				}
 				finalizedHead, err := engine_api.GetHeaderByTag(c.ctx, "finalized")
 				if err != nil {
-					panic(err)
+					log.Error("failed to get finalized header", err)
 				}
 
 				// send forkchoiceupdated (to trigger block building)
@@ -85,15 +81,12 @@ func (c *CLMock) clmockLoop() {
 				})
 
 				if err != nil {
-					// TODO: log error and hard-quit
-					panic(err)
+					log.Error("failed to trigger block building via forkchoiceupdated", err)
 				}
-
-				fmt.Printf("forkchoice updated payload id = %d\n", fcState.PayloadID)
 
 				var payload *engine.ExecutableData
 
-				buildTicker := time.NewTicker(100 * time.Millisecond)
+				buildTicker := time.NewTicker(50 * time.Millisecond)
 				// spin a bit until the payload is built
 				for {
 					var done bool
@@ -103,6 +96,7 @@ func (c *CLMock) clmockLoop() {
 						payload, err = engine_api.GetPayloadV1(c.ctx, fcState.PayloadID)
 						if err != nil {
 							// TODO: if err is that the payload is still building, continue spinning
+							// otherwise: fail hard (?)
 							panic(err)
 						}
 						done = true
@@ -115,10 +109,15 @@ func (c *CLMock) clmockLoop() {
 					}
 				}
 
-				fmt.Println("marking payload as canon")
+				if len(payload.Transactions) == 0 {
+					// don't create a block if there are no transactions
+					log.Warn("no transactions.  waiting for more")
+					continue
+				}
+
 				// mark the payload as canon
 				if err = engine_api.NewPayloadV1(c.ctx, payload); err != nil {
-					panic(err)
+					log.Error("failed to mark payload as canonical: %v", err)
 				}
 
 				newForkchoiceState := &engine.ForkchoiceStateV1{
@@ -130,7 +129,7 @@ func (c *CLMock) clmockLoop() {
 				// send Forkchoiceupdated (TODO: only if the payload had transactions)
 				_, err = engine_api.ForkchoiceUpdatedV1(c.ctx, newForkchoiceState, nil)
 				if err != nil {
-					panic(err)
+					log.Error("failed to mark block as canonical", err)
 				}
 				lastBlockTime = time.Now()
 				curForkchoiceState = newForkchoiceState
@@ -138,9 +137,3 @@ func (c *CLMock) clmockLoop() {
 		}
 	}
 }
-
-/*
-func (c *CLMock) Stop() {
-	c.ctx.Cancel()
-}
-*/
