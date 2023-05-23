@@ -2,11 +2,10 @@ package clmock
 
 import (
 	"context"
-	"time"
 
-	"net/http"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -14,15 +13,16 @@ type engineAPI struct {
 	client *rpc.Client
 }
 
-func (e *engineAPI) Connect(ctx context.Context, httpEndpoint string) error {
-	httpEndpoint = "http://127.0.0.1:8545"
-	client, err := rpc.DialOptions(ctx, httpEndpoint, rpc.WithHTTPClient(&http.Client{
-                Timeout: 10 * time.Second,
-        }))
+func (e *engineAPI) Connect(ctx context.Context, endpoint string) error {
+	var testSecret = [32]byte{94, 111, 36, 109, 245, 74, 43, 72, 202, 33, 205, 86, 199, 174, 186, 77, 165, 99, 13, 225, 149, 121, 125, 249, 128, 109, 219, 163, 224, 176, 46, 233}
+	var testEndpoint = "http://127.0.0.1:8551"
 
+	auth := node.NewJWTAuth(testSecret)
+	client, err := rpc.DialOptions(ctx, testEndpoint, rpc.WithHTTPAuth(auth))
 	if err != nil {
 		return err
 	}
+
 	e.client = client
 	return nil
 }
