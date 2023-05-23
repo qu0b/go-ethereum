@@ -14,7 +14,9 @@ type engineAPI struct {
 	client *rpc.Client
 }
 
+// Connect establishes a connection to the engine API of this node (assumed to be HTTP for now)
 func (e *engineAPI) Connect(ctx context.Context, endpoint string) error {
+	// TODO don't hardcode these here
 	var testSecret = [32]byte{94, 111, 36, 109, 245, 74, 43, 72, 202, 33, 205, 86, 199, 174, 186, 77, 165, 99, 13, 225, 149, 121, 125, 249, 128, 109, 219, 163, 224, 176, 46, 233}
 	var testEndpoint = "http://127.0.0.1:8551"
 

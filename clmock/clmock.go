@@ -1,3 +1,19 @@
+// Copyright 2023 The go-ethereum Authors
+// This file is part of the go-ethereum library.
+//
+// The go-ethereum library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The go-ethereum library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+
 package clmock
 
 import (
@@ -13,18 +29,21 @@ type CLMock struct {
 	cancel context.CancelFunc
 }
 
+// Start invokes the clmock life-cycle function in a goroutine
 func (c *CLMock) Start() {
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	go c.clmockLoop()
 }
 
+// Stop halts the clmock service
 func (c * CLMock) Stop() {
-	c.ctx.Done()
 	c.cancel()
 }
 
 // TODO: use ctx with timeout when calling rpc methods? is there a way they could hang indefinitely (even though we are calling on same machine/process)?
 
+// clmockLoop manages the lifecycle of clmock.
+// it drives block production, taking the role of a CL client and interacting with Geth via the engine API
 func (c *CLMock) clmockLoop() {
 	ticker := time.NewTicker(time.Millisecond * 500)
 	blockPeriod := time.Second * 2
@@ -62,8 +81,6 @@ func (c *CLMock) clmockLoop() {
 			break
 		case curTime := <-ticker.C:
 			if curTime.After(lastBlockTime.Add(blockPeriod)) {
-				// get the current head and populate curForkchoiceState
-
 				safeHead, err := engine_api.GetHeaderByTag(c.ctx, "safe")
 				if err != nil {
 					log.Error("failed to get safe header", err)
@@ -73,7 +90,7 @@ func (c *CLMock) clmockLoop() {
 					log.Error("failed to get finalized header", err)
 				}
 
-				// send forkchoiceupdated (to trigger block building)
+				// trigger block building (via forkchoiceupdated)
 				fcState, err := engine_api.ForkchoiceUpdatedV1(c.ctx, curForkchoiceState, &engine.PayloadAttributes{
 					Timestamp: uint64(curTime.Unix()), // TODO make sure conversion from int64->uint64 is okay here (should be fine)
 					Random: prevRandaoVal,
