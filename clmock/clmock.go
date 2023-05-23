@@ -44,11 +44,15 @@ func (c *CLMock) clmockLoop() {
 		panic(err)
 	}
 
-	_, err = engine_api.ForkchoiceUpdatedV1(c.ctx, &engine.ForkchoiceStateV1{
+	fmt.Printf("genesis header %x\n", header.Hash())
+
+	curForkchoiceState = &engine.ForkchoiceStateV1{
 		HeadBlockHash: header.Hash(),
 		SafeBlockHash: header.Hash(),
 		FinalizedBlockHash: header.Hash(),
-	}, nil)
+	}
+
+	_, err = engine_api.ForkchoiceUpdatedV1(c.ctx, curForkchoiceState, nil)
 
 	if err != nil {
 		panic(err)
