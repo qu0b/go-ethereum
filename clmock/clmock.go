@@ -46,7 +46,7 @@ func (c * CLMock) Stop() {
 // it drives block production, taking the role of a CL client and interacting with Geth via the engine API
 func (c *CLMock) clmockLoop() {
 	ticker := time.NewTicker(time.Millisecond * 500)
-	blockPeriod := time.Second * 2
+	blockPeriod := time.Second * 2 // hard-coded fast block period for testing purposes
 	lastBlockTime := time.Now()
 
 	var curForkchoiceState *engine.ForkchoiceStateV1
