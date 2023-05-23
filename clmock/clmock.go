@@ -2,6 +2,7 @@ package clmock
 
 import (
 	"context"
+	"fmt"
 	"time"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -26,7 +27,7 @@ func (c * CLMock) Stop() {
 
 func (c *CLMock) clmockLoop() {
 	ticker := time.NewTicker(time.Millisecond * 500)
-	blockPeriod := time.Second * 12
+	blockPeriod := time.Second * 1
 	lastBlockTime := time.Now()
 
 	var curForkchoiceState *engine.ForkchoiceStateV1
@@ -58,8 +59,10 @@ func (c *CLMock) clmockLoop() {
 		case _ = <-c.ctx.Done():
 			break
 		case curTime := <-ticker.C:
+			fmt.Println("pretick")
 			if curTime.After(lastBlockTime.Add(blockPeriod)) {
 				// get the current head and populate curForkchoiceState
+				fmt.Println("tick")
 
 				safeHead, err := engine_api.GetHeaderByTag(c.ctx, "safe")
 				if err != nil {
@@ -81,6 +84,8 @@ func (c *CLMock) clmockLoop() {
 					// TODO: log error and hard-quit
 					panic(err)
 				}
+
+				fmt.Printf("forkchoice updated payload id = %d\n", fcState.PayloadID)
 
 				var payload *engine.ExecutableData
 

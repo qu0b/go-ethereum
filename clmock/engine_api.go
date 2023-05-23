@@ -2,6 +2,7 @@ package clmock
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/beacon/engine"
@@ -28,11 +29,11 @@ func (e *engineAPI) Connect(ctx context.Context, endpoint string) error {
 }
 
 func (e *engineAPI) ForkchoiceUpdatedV1(ctx context.Context, fcState *engine.ForkchoiceStateV1, payloadAttr *engine.PayloadAttributes) (*engine.ForkChoiceResponse, error) {
-	var resp engine.ForkChoiceResponse
+	var resp *engine.ForkChoiceResponse
 	if err := e.client.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV1", fcState, payloadAttr); err != nil {
 		return nil, err
 	}
-	return &resp, nil
+	return resp, nil
 }
 
 func (e *engineAPI) GetPayloadV1(ctx context.Context, id *engine.PayloadID) (*engine.ExecutableData, error) {
@@ -53,7 +54,7 @@ func (e *engineAPI) NewPayloadV1(ctx context.Context, payload *engine.Executable
 
 func (e *engineAPI) GetHeaderByTag(ctx context.Context, tag string) (*types.Header, error) {
 	var header *types.Header
-	if err := e.client.CallContext(ctx, &header, "eth_getBlockByNumber", tag); err != nil {
+	if err := e.client.CallContext(ctx, &header, "eth_getBlockByNumber", tag, false); err != nil {
 		return nil, err
 	}
 	return header, nil
@@ -61,7 +62,7 @@ func (e *engineAPI) GetHeaderByTag(ctx context.Context, tag string) (*types.Head
 
 func (e *engineAPI) GetHeaderByNumber(ctx context.Context, number uint64) (*types.Header, error) {
 	var header *types.Header
-	if err := e.client.CallContext(ctx, &header, "eth_getBlockByNumber", number); err != nil {
+	if err := e.client.CallContext(ctx, &header, "eth_getBlockByNumber", fmt.Sprintf("0x%x", number), false); err != nil {
 		return nil, err
 	}
 	return header, nil
