@@ -18,14 +18,14 @@ package clmock
 
 import (
 	"context"
-	"time"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"time"
 )
 
 type CLMock struct {
-	ctx context.Context
+	ctx    context.Context
 	cancel context.CancelFunc
 }
 
@@ -36,7 +36,7 @@ func (c *CLMock) Start() {
 }
 
 // Stop halts the clmock service
-func (c * CLMock) Stop() {
+func (c *CLMock) Stop() {
 	c.cancel()
 }
 
@@ -60,19 +60,19 @@ func (c *CLMock) clmockLoop() {
 
 	header, err := engine_api.GetHeaderByNumber(c.ctx, 0)
 	if err != nil {
-		log.Error("failed to get genesis block header", err)
+		log.Error("failed to get genesis block header", "err", err)
 	}
 
 	curForkchoiceState = &engine.ForkchoiceStateV1{
-		HeadBlockHash: header.Hash(),
-		SafeBlockHash: header.Hash(),
+		HeadBlockHash:      header.Hash(),
+		SafeBlockHash:      header.Hash(),
 		FinalizedBlockHash: header.Hash(),
 	}
 
 	_, err = engine_api.ForkchoiceUpdatedV1(c.ctx, curForkchoiceState, nil)
 
 	if err != nil {
-		log.Error("failed to initiate PoS transition for genesis via Forkchoiceupdated", err)
+		log.Error("failed to initiate PoS transition for genesis via Forkchoiceupdated", "err", err)
 	}
 
 	for {
@@ -83,22 +83,22 @@ func (c *CLMock) clmockLoop() {
 			if curTime.After(lastBlockTime.Add(blockPeriod)) {
 				safeHead, err := engine_api.GetHeaderByTag(c.ctx, "safe")
 				if err != nil {
-					log.Error("failed to get safe header", err)
+					log.Error("failed to get safe header", "err", err)
 				}
 				finalizedHead, err := engine_api.GetHeaderByTag(c.ctx, "finalized")
 				if err != nil {
-					log.Error("failed to get finalized header", err)
+					log.Error("failed to get finalized header", "err", err)
 				}
 
 				// trigger block building (via forkchoiceupdated)
 				fcState, err := engine_api.ForkchoiceUpdatedV1(c.ctx, curForkchoiceState, &engine.PayloadAttributes{
-					Timestamp: uint64(curTime.Unix()), // TODO make sure conversion from int64->uint64 is okay here (should be fine)
-					Random: prevRandaoVal,
+					Timestamp:             uint64(curTime.Unix()), // TODO make sure conversion from int64->uint64 is okay here (should be fine)
+					Random:                prevRandaoVal,
 					SuggestedFeeRecipient: suggestedFeeRecipient,
 				})
 
 				if err != nil {
-					log.Error("failed to trigger block building via forkchoiceupdated", err)
+					log.Error("failed to trigger block building via forkchoiceupdated", "err", err)
 				}
 
 				var payload *engine.ExecutableData
@@ -134,19 +134,19 @@ func (c *CLMock) clmockLoop() {
 
 				// mark the payload as canon
 				if err = engine_api.NewPayloadV1(c.ctx, payload); err != nil {
-					log.Error("failed to mark payload as canonical: %v", err)
+					log.Error("failed to mark payload as canonical", "err", err)
 				}
 
 				newForkchoiceState := &engine.ForkchoiceStateV1{
-					HeadBlockHash: payload.BlockHash,
-					SafeBlockHash: safeHead.Hash(),
+					HeadBlockHash:      payload.BlockHash,
+					SafeBlockHash:      safeHead.Hash(),
 					FinalizedBlockHash: finalizedHead.Hash(),
 				}
 
 				// send Forkchoiceupdated (TODO: only if the payload had transactions)
 				_, err = engine_api.ForkchoiceUpdatedV1(c.ctx, newForkchoiceState, nil)
 				if err != nil {
-					log.Error("failed to mark block as canonical", err)
+					log.Error("failed to mark block as canonical", "err", err)
 				}
 				lastBlockTime = time.Now()
 				curForkchoiceState = newForkchoiceState

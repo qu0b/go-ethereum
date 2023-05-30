@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -33,7 +33,7 @@ type engineAPI struct {
 // Connect establishes a connection to the engine API of this node (assumed to be HTTP for now)
 func (e *engineAPI) Connect(ctx context.Context, endpoint string) error {
 	// TODO don't hardcode these here
-	var testSecret = [32]byte{94, 111, 36, 109, 245, 74, 43, 72, 202, 33, 205, 86, 199, 174, 186, 77, 165, 99, 13, 225, 149, 121, 125, 249, 128, 109, 219, 163, 224, 176, 46, 233}
+	testSecret := [32]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	var testEndpoint = "http://127.0.0.1:8551"
 
 	auth := node.NewJWTAuth(testSecret)
