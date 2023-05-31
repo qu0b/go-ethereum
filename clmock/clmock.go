@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type CLMock struct {
@@ -78,8 +79,7 @@ func (c *CLMock) clmockLoop() {
 		panic("crap")
 	}
 
-	// TODO: don't use APIBackend (access blockchain directly instead)
-	header, err := c.backend.HeaderByNumber(context.Background(), 0)
+	header, err := c.backend.HeaderByNumber(context.Background(), rpc.LatestBlockNumber)
 	if err != nil {
 		log.Crit("failed to get genesis block header", "err", err)
 	}
