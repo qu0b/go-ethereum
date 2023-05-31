@@ -24,7 +24,6 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/clmock"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -90,7 +89,6 @@ type Ethereum struct {
 	miner     *miner.Miner
 	gasPrice  *big.Int
 	etherbase common.Address
-	clmock clmock.CLMock
 
 	networkID     uint64
 	netRPCService *ethapi.NetAPI
@@ -257,8 +255,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	stack.RegisterAPIs(eth.APIs())
 	stack.RegisterProtocols(eth.Protocols())
 	stack.RegisterLifecycle(eth)
-
-	eth.clmock = CLMock{stack: stack, backend: eth.APIBackend}
 
 	// Successful startup; push a marker and check previous unclean shutdowns.
 	eth.shutdownTracker.MarkStartup()
@@ -436,14 +432,6 @@ func (s *Ethereum) StartMining() error {
 	return nil
 }
 
-func (s *Ethereum) StartCLMock() {
-	s.clmock.Start()
-}
-
-func (s *Ethereum) StopCLMock() {
-	s.clmock.Stop()
-}
-
 // StopMining terminates the miner, both at the consensus engine level as well as
 // at the block creation level.
 func (s *Ethereum) StopMining() {
@@ -528,7 +516,6 @@ func (s *Ethereum) Stop() error {
 	s.miner.Close()
 	s.blockchain.Stop()
 	s.engine.Close()
-	s.clmock.Stop()
 
 	// Clean shutdown marker as the last thing before closing db
 	s.shutdownTracker.Stop()

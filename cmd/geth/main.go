@@ -27,6 +27,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/clmock"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/console/prompt"
@@ -325,6 +326,12 @@ func geth(ctx *cli.Context) error {
 	stack, backend := makeFullNode(ctx)
 	defer stack.Close()
 
+	if ctx.IsSet(utils.DeveloperFlag.Name) {
+		mock := clmock.NewCLMock(stack, backend)
+		mock.Start()
+		defer mock.Stop()
+	}
+
 	startNode(ctx, stack, backend, false)
 	stack.Wait()
 	return nil
@@ -426,15 +433,6 @@ func startNode(ctx *cli.Context, stack *node.Node, backend ethapi.Backend, isCon
 		if err := ethBackend.StartMining(); err != nil {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
-	}
-
-	if ctx.Bool(utils.DeveloperFlag.Name) {
-		ethBackend, ok := backend.(*eth.EthAPIBackend)
-		if !ok {
-			utils.Fatalf("Ethereum service not running")
-		}
-		// TODO start engine-api as well (instead of having to specify the flags manually)
-		ethBackend.StartCLMock()
 	}
 }
 

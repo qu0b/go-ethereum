@@ -34,6 +34,13 @@ type CLMock struct {
 	backend ethapi.Backend
 }
 
+func NewCLMock(stack *node.Node, backend ethapi.Backend) *CLMock {
+	c := CLMock{}
+	c.stack = stack
+	c.backend = backend
+	return &c
+}
+
 // Start invokes the clmock life-cycle function in a goroutine
 func (c *CLMock) Start() {
 	c.ctx, c.cancel = context.WithCancel(context.Background())
@@ -50,18 +57,21 @@ func (c *CLMock) Stop() {
 // clmockLoop manages the lifecycle of clmock.
 // it drives block production, taking the role of a CL client and interacting with Geth via the engine API
 func (c *CLMock) clmockLoop() {
+	// TODO: (randomly placed here as a reminder to note it somewhere more prominent:
+	// how do we sync node shutdown with this separate go-routine?
+	//
 	ticker := time.NewTicker(time.Millisecond * 500)
 	blockPeriod := time.Second * 2 // hard-coded fast block period for testing purposes
 	lastBlockTime := time.Now()
 
-	var curForkchoiceState *engine.ForkchoiceStateV1
+	var curForkchoiceState engine.ForkchoiceStateV1
 	var prevRandaoVal common.Hash
 	var suggestedFeeRecipient common.Address
 
 	// dangerous? TODO: ensure this first call can't possibly fail
 	engs := c.stack.GetAPIsByNamespace("engine")
 	eng := engs[0]
-	engine, _ := eng.Service.(ConsensusAPI)
+	engineAPI, _ := eng.Service.(catalyst.ConsensusAPI)
 
 	// TODO: don't use APIBackend (access blockchain directly instead)
 	header, err := c.backend.HeaderByNumber(context.Background(), 0)
@@ -69,13 +79,13 @@ func (c *CLMock) clmockLoop() {
 		log.Error("failed to get genesis block header", "err", err)
 	}
 
-	curForkchoiceState = &engine.ForkchoiceStateV1{
+	curForkchoiceState = engine.ForkchoiceStateV1{
 		HeadBlockHash:      header.Hash(),
 		SafeBlockHash:      header.Hash(),
 		FinalizedBlockHash: header.Hash(),
 	}
 
-	_, err = engine.ForkchoiceUpdatedV1(curForkchoiceState, nil)
+	_, err = engineAPI.ForkchoiceUpdatedV1(curForkchoiceState, nil)
 
 	if err != nil {
 		log.Error("failed to initiate PoS transition for genesis via Forkchoiceupdated", "err", err)
@@ -88,7 +98,7 @@ func (c *CLMock) clmockLoop() {
 		case curTime := <-ticker.C:
 			if curTime.After(lastBlockTime.Add(blockPeriod)) {
 				// trigger block building (via forkchoiceupdated)
-				fcState, err := engine.ForkchoiceUpdatedV1(curForkchoiceState, &engine.PayloadAttributes{
+				fcState, err := engineAPI.ForkchoiceUpdatedV1(curForkchoiceState, &engine.PayloadAttributes{
 					Timestamp:             uint64(curTime.Unix()), // TODO make sure conversion from int64->uint64 is okay here (should be fine)
 					Random:                prevRandaoVal,
 					SuggestedFeeRecipient: suggestedFeeRecipient,
@@ -107,7 +117,7 @@ func (c *CLMock) clmockLoop() {
 					select {
 					case _ = <-buildTicker.C:
 						// try and get the payload
-						payload, err = engine.GetPayloadV1(fcState.PayloadID)
+						payload, err = engineAPI.GetPayloadV1(*fcState.PayloadID)
 						if err != nil {
 							// TODO: if err is that the payload is still building, continue spinning
 							// otherwise: fail hard (?)
@@ -130,7 +140,7 @@ func (c *CLMock) clmockLoop() {
 				}
 
 				// mark the payload as canon
-				if err = engine.NewPayloadV1(payload); err != nil {
+				if _, err = engineAPI.NewPayloadV1(*payload); err != nil {
 					log.Error("failed to mark payload as canonical", "err", err)
 				}
 
@@ -141,12 +151,12 @@ func (c *CLMock) clmockLoop() {
 				}
 
 				// send Forkchoiceupdated (TODO: only if the payload had transactions)
-				_, err = engine.ForkchoiceUpdatedV1(newForkchoiceState, nil)
+				_, err = engineAPI.ForkchoiceUpdatedV1(*newForkchoiceState, nil)
 				if err != nil {
 					log.Error("failed to mark block as canonical", "err", err)
 				}
 				lastBlockTime = time.Now()
-				curForkchoiceState = newForkchoiceState
+				curForkchoiceState = *newForkchoiceState
 			}
 		}
 	}
