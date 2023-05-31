@@ -31,16 +31,22 @@ import (
 )
 
 type CLMock struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	stack  *node.Node
+	ctx     context.Context
+	cancel  context.CancelFunc
+	stack   *node.Node
 	backend ethapi.Backend
+	blockPeriod  time.Duration
+	gasLimit uint64
 }
 
 func NewCLMock(stack *node.Node, backend ethapi.Backend) *CLMock {
 	c := CLMock{}
 	c.stack = stack
 	c.backend = backend
+	cfg := stack.Config()
+	c.blockPeriod = cfg.Genesis.DeveloperModeConfig.Period
+	// TODO: allow this to be overriden via rpc call?  check that this is the current behavior when invoking miner.SetGasLimit while dev mode is activated
+	c.gasLimit = cfg.Genesis.GasLimit
 	return &c
 }
 
@@ -61,10 +67,10 @@ func (c *CLMock) Stop() {
 // it drives block production, taking the role of a CL client and interacting with Geth via the engine API
 func (c *CLMock) clmockLoop() {
 	// TODO: (randomly placed here as a reminder to note it somewhere more prominent:
-	// how do we sync node shutdown with this separate go-routine?
-	//
+	// how do we sync node shutdown with this separate go-routine? 
+	// does it matter?  the worst that can happen is we get some weird error messages on node shutdown that might throw users off
 	ticker := time.NewTicker(time.Millisecond * 500)
-	blockPeriod := time.Second * 2 // hard-coded fast block period for testing purposes
+	blockPeriod := time.Second * 10 // hard-coded fast block period for testing purposes
 	lastBlockTime := time.Now()
 
 	var curForkchoiceState engine.ForkchoiceStateV1
@@ -124,7 +130,7 @@ func (c *CLMock) clmockLoop() {
 				for {
 					var done bool
 					select {
-					case _ = <-buildTicker.C:
+					case <-buildTicker.C:
 						// try and get the payload
 						payload, err = engineAPI.GetPayloadV1(*fcState.PayloadID)
 						if err != nil {
@@ -134,7 +140,7 @@ func (c *CLMock) clmockLoop() {
 						}
 						done = true
 						break
-					case _ = <-c.ctx.Done():
+					case <-c.ctx.Done():
 						return
 					}
 					if done {
@@ -144,7 +150,7 @@ func (c *CLMock) clmockLoop() {
 
 				if len(payload.Transactions) == 0 {
 					// don't create a block if there are no transactions
-					log.Warn("no transactions.  waiting for more")
+					time.Sleep(blockPeriod)
 					continue
 				}
 
