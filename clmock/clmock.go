@@ -19,6 +19,7 @@ package clmock
 import (
 	"context"
 	"time"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
@@ -81,7 +82,7 @@ func (c *CLMock) clmockLoop() {
 
 	header, err := c.backend.HeaderByNumber(context.Background(), rpc.LatestBlockNumber)
 	if err != nil {
-		log.Crit("failed to get genesis block header", "err", err)
+		log.Crit("failed to get latest block header", "err", err)
 	}
 
 	curForkchoiceState = engine.ForkchoiceStateV1{
@@ -90,7 +91,10 @@ func (c *CLMock) clmockLoop() {
 		FinalizedBlockHash: header.Hash(),
 	}
 
-	_, err = engineAPI.ForkchoiceUpdatedV1(curForkchoiceState, nil)
+	// if genesis block, send forkchoiceupdated to trigger transition to PoS
+	if header.Number.Cmp(big.NewInt(0)) == 0 {
+		_, err = engineAPI.ForkchoiceUpdatedV1(curForkchoiceState, nil)
+	}
 
 	if err != nil {
 		log.Crit("failed to initiate PoS transition for genesis via Forkchoiceupdated", "err", err)
