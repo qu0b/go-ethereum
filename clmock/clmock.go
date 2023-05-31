@@ -98,7 +98,7 @@ func (c *CLMock) clmockLoop() {
 
 	for {
 		select {
-		case _ = <-c.ctx.Done():
+		case <-c.ctx.Done():
 			break
 		case curTime := <-ticker.C:
 			if curTime.After(lastBlockTime.Add(blockPeriod)) {
