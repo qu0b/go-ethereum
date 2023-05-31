@@ -326,13 +326,13 @@ func geth(ctx *cli.Context) error {
 	stack, backend := makeFullNode(ctx)
 	defer stack.Close()
 
+	startNode(ctx, stack, backend, false)
+
 	if ctx.IsSet(utils.DeveloperFlag.Name) {
 		mock := clmock.NewCLMock(stack, backend)
 		mock.Start()
 		defer mock.Stop()
 	}
-
-	startNode(ctx, stack, backend, false)
 	stack.Wait()
 	return nil
 }

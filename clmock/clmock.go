@@ -18,13 +18,14 @@ package clmock
 
 import (
 	"context"
+	"time"
+
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/internal/ethapi"
-	"time"
 )
 
 type CLMock struct {
@@ -70,8 +71,12 @@ func (c *CLMock) clmockLoop() {
 
 	// dangerous? TODO: ensure this first call can't possibly fail
 	engs := c.stack.GetAPIsByNamespace("engine")
+
 	eng := engs[0]
-	engineAPI, _ := eng.Service.(catalyst.ConsensusAPI)
+	engineAPI, ok := eng.Service.(*catalyst.ConsensusAPI)
+	if !ok {
+		panic("crap")
+	}
 
 	// TODO: don't use APIBackend (access blockchain directly instead)
 	header, err := c.backend.HeaderByNumber(context.Background(), 0)
