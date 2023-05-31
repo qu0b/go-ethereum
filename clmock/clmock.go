@@ -81,7 +81,7 @@ func (c *CLMock) clmockLoop() {
 	// TODO: don't use APIBackend (access blockchain directly instead)
 	header, err := c.backend.HeaderByNumber(context.Background(), 0)
 	if err != nil {
-		log.Error("failed to get genesis block header", "err", err)
+		log.Crit("failed to get genesis block header", "err", err)
 	}
 
 	curForkchoiceState = engine.ForkchoiceStateV1{
@@ -93,7 +93,7 @@ func (c *CLMock) clmockLoop() {
 	_, err = engineAPI.ForkchoiceUpdatedV1(curForkchoiceState, nil)
 
 	if err != nil {
-		log.Error("failed to initiate PoS transition for genesis via Forkchoiceupdated", "err", err)
+		log.Crit("failed to initiate PoS transition for genesis via Forkchoiceupdated", "err", err)
 	}
 
 	for {
@@ -110,7 +110,7 @@ func (c *CLMock) clmockLoop() {
 				})
 
 				if err != nil {
-					log.Error("failed to trigger block building via forkchoiceupdated", "err", err)
+					log.Crit("failed to trigger block building via forkchoiceupdated", "err", err)
 				}
 
 				var payload *engine.ExecutableData
@@ -146,7 +146,7 @@ func (c *CLMock) clmockLoop() {
 
 				// mark the payload as canon
 				if _, err = engineAPI.NewPayloadV1(*payload); err != nil {
-					log.Error("failed to mark payload as canonical", "err", err)
+					log.Crit("failed to mark payload as canonical", "err", err)
 				}
 
 				newForkchoiceState := &engine.ForkchoiceStateV1{
@@ -158,7 +158,7 @@ func (c *CLMock) clmockLoop() {
 				// send Forkchoiceupdated (TODO: only if the payload had transactions)
 				_, err = engineAPI.ForkchoiceUpdatedV1(*newForkchoiceState, nil)
 				if err != nil {
-					log.Error("failed to mark block as canonical", "err", err)
+					log.Crit("failed to mark block as canonical", "err", err)
 				}
 				lastBlockTime = time.Now()
 				curForkchoiceState = *newForkchoiceState
