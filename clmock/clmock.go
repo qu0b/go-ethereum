@@ -36,17 +36,14 @@ type CLMock struct {
 	stack   *node.Node
 	backend ethapi.Backend
 	blockPeriod  time.Duration
-	gasLimit uint64
 }
 
 func NewCLMock(stack *node.Node, backend ethapi.Backend) *CLMock {
 	c := CLMock{}
 	c.stack = stack
 	c.backend = backend
-	cfg := stack.Config()
-	c.blockPeriod = cfg.Genesis.DeveloperModeConfig.Period
-	// TODO: allow this to be overriden via rpc call?  check that this is the current behavior when invoking miner.SetGasLimit while dev mode is activated
-	c.gasLimit = cfg.Genesis.GasLimit
+	chainConfig := backend.ChainConfig()
+	c.blockPeriod = time.Duration(chainConfig.Dev.Period)
 	return &c
 }
 
