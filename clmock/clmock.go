@@ -58,8 +58,6 @@ func (c *CLMock) Stop() {
 	c.cancel()
 }
 
-// TODO: use ctx with timeout when calling rpc methods? is there a way they could hang indefinitely (even though we are calling on same machine/process)?
-
 // clmockLoop manages the lifecycle of clmock.
 // it drives block production, taking the role of a CL client and interacting with Geth via the engine API
 func (c *CLMock) clmockLoop() {
@@ -74,13 +72,13 @@ func (c *CLMock) clmockLoop() {
 	var prevRandaoVal common.Hash
 	var suggestedFeeRecipient common.Address
 
-	// dangerous? TODO: ensure this first call can't possibly fail
+	// TODO: the following seems like a pretty sketchy/dangerous way to retrieve the ConsensusAPI
+	// unsure of a cleaner way
 	engs := c.stack.GetAPIsByNamespace("engine")
-
 	eng := engs[0]
 	engineAPI, ok := eng.Service.(*catalyst.ConsensusAPI)
 	if !ok {
-		panic("crap")
+		log.Crit("API returned under namespace \"engine\" should have type *catalyst.ConsensusAPI")
 	}
 
 	header, err := c.backend.HeaderByNumber(context.Background(), rpc.LatestBlockNumber)
@@ -111,7 +109,7 @@ func (c *CLMock) clmockLoop() {
 			if curTime.After(lastBlockTime.Add(blockPeriod)) {
 				// trigger block building (via forkchoiceupdated)
 				fcState, err := engineAPI.ForkchoiceUpdatedV1(curForkchoiceState, &engine.PayloadAttributes{
-					Timestamp:             uint64(curTime.Unix()), // TODO make sure conversion from int64->uint64 is okay here (should be fine)
+					Timestamp:             uint64(curTime.Unix()),
 					Random:                prevRandaoVal,
 					SuggestedFeeRecipient: suggestedFeeRecipient,
 				})
@@ -123,17 +121,15 @@ func (c *CLMock) clmockLoop() {
 				var payload *engine.ExecutableData
 
 				buildTicker := time.NewTicker(50 * time.Millisecond)
-				// spin a bit until the payload is built
+				// build the payload
 				for {
 					var done bool
 					select {
 					case <-buildTicker.C:
-						// try and get the payload
 						payload, err = engineAPI.GetPayloadV1(*fcState.PayloadID)
 						if err != nil {
-							// TODO: if err is that the payload is still building, continue spinning
-							// otherwise: fail hard (?)
-							panic(err)
+							// the payload is still building, wait a bit and check again
+							continue
 						}
 						done = true
 						break
@@ -151,7 +147,7 @@ func (c *CLMock) clmockLoop() {
 					continue
 				}
 
-				// mark the payload as canon
+				// mark the payload as canonical
 				if _, err = engineAPI.NewPayloadV1(*payload); err != nil {
 					log.Crit("failed to mark payload as canonical", "err", err)
 				}
@@ -162,7 +158,7 @@ func (c *CLMock) clmockLoop() {
 					FinalizedBlockHash: payload.BlockHash,
 				}
 
-				// send Forkchoiceupdated (TODO: only if the payload had transactions)
+				// mark the block containing the payload as canonical
 				_, err = engineAPI.ForkchoiceUpdatedV1(*newForkchoiceState, nil)
 				if err != nil {
 					log.Crit("failed to mark block as canonical", "err", err)
