@@ -318,9 +318,9 @@ type ChainConfig struct {
 	TerminalTotalDifficultyPassed bool `json:"terminalTotalDifficultyPassed,omitempty"`
 
 	// Various consensus engines
-	Ethash *EthashConfig `json:"ethash,omitempty"`
-	Clique *CliqueConfig `json:"clique,omitempty"`
-	Dev *DeveloperModeConfig `json:"dev,omitempty"`
+	Ethash *EthashConfig        `json:"ethash,omitempty"`
+	Clique *CliqueConfig        `json:"clique,omitempty"`
+	Dev    *DeveloperModeConfig `json:"dev,omitempty"`
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.

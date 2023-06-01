@@ -18,24 +18,24 @@ package clmock
 
 import (
 	"context"
-	"time"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
-	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/eth/catalyst"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type CLMock struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	stack   *node.Node
-	backend ethapi.Backend
-	blockPeriod  time.Duration
+	ctx         context.Context
+	cancel      context.CancelFunc
+	stack       *node.Node
+	backend     ethapi.Backend
+	blockPeriod time.Duration
 }
 
 func NewCLMock(stack *node.Node, backend ethapi.Backend) *CLMock {
@@ -64,7 +64,7 @@ func (c *CLMock) Stop() {
 // it drives block production, taking the role of a CL client and interacting with Geth via the engine API
 func (c *CLMock) clmockLoop() {
 	// TODO: (randomly placed here as a reminder to note it somewhere more prominent:
-	// how do we sync node shutdown with this separate go-routine? 
+	// how do we sync node shutdown with this separate go-routine?
 	// does it matter?  the worst that can happen is we get some weird error messages on node shutdown that might throw users off
 	ticker := time.NewTicker(time.Millisecond * 500)
 	blockPeriod := time.Second * 10 // hard-coded fast block period for testing purposes
