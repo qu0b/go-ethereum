@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/clmock"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/console"
 	"github.com/ethereum/go-ethereum/internal/flags"
@@ -74,11 +73,6 @@ func localConsole(ctx *cli.Context) error {
 	stack, backend := makeFullNode(ctx)
 	startNode(ctx, stack, backend, true)
 
-	if ctx.IsSet(utils.DeveloperFlag.Name) {
-		mock := clmock.NewCLMock(stack, backend)
-		mock.Start()
-		defer mock.Stop()
-	}
 	defer stack.Close()
 
 	// Attach to the newly started node and create the JavaScript console.

@@ -27,7 +27,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/clmock"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/console/prompt"
@@ -328,11 +327,6 @@ func geth(ctx *cli.Context) error {
 
 	startNode(ctx, stack, backend, false)
 
-	if ctx.IsSet(utils.DeveloperFlag.Name) {
-		mock := clmock.NewCLMock(stack, backend)
-		mock.Start()
-		defer mock.Stop()
-	}
 	stack.Wait()
 	return nil
 }

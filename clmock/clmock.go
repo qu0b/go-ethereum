@@ -23,39 +23,40 @@ import (
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
-	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type CLMock struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	stack       *node.Node
-	backend     ethapi.Backend
+	eth         *eth.Ethereum
 	blockPeriod time.Duration
 }
 
-func NewCLMock(stack *node.Node, backend ethapi.Backend) *CLMock {
-	c := CLMock{}
-	c.stack = stack
-	c.backend = backend
-	chainConfig := backend.ChainConfig()
-	c.blockPeriod = time.Duration(chainConfig.Dev.Period)
-	return &c
+func NewCLMock(stack *node.Node, eth *eth.Ethereum) *CLMock {
+	chainConfig := eth.APIBackend.ChainConfig()
+	return &CLMock{
+		stack:       stack,
+		eth:         eth,
+		blockPeriod: time.Duration(chainConfig.Dev.Period),
+	}
 }
 
 // Start invokes the clmock life-cycle function in a goroutine
-func (c *CLMock) Start() {
+func (c *CLMock) Start() error {
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	go c.clmockLoop()
+	return nil
 }
 
 // Stop halts the clmock service
-func (c *CLMock) Stop() {
+func (c *CLMock) Stop() error {
 	c.cancel()
+	return nil
 }
 
 // clmockLoop manages the lifecycle of clmock.
@@ -74,17 +75,9 @@ func (c *CLMock) clmockLoop() {
 
 	// TODO: the following seems like a pretty sketchy/dangerous way to retrieve the ConsensusAPI
 	// unsure of a cleaner way
-	engs := c.stack.GetAPIsByNamespace("engine")
-	eng := engs[0]
-	engineAPI, ok := eng.Service.(*catalyst.ConsensusAPI)
-	if !ok {
-		log.Crit("API returned under namespace \"engine\" should have type *catalyst.ConsensusAPI")
-	}
+	engineAPI := catalyst.NewConsensusAPI(c.eth)
 
-	header, err := c.backend.HeaderByNumber(context.Background(), rpc.LatestBlockNumber)
-	if err != nil {
-		log.Crit("failed to get latest block header", "err", err)
-	}
+	header := c.eth.BlockChain().CurrentHeader()
 
 	curForkchoiceState = engine.ForkchoiceStateV1{
 		HeadBlockHash:      header.Hash(),
@@ -92,13 +85,11 @@ func (c *CLMock) clmockLoop() {
 		FinalizedBlockHash: header.Hash(),
 	}
 
-	// if genesis block, send forkchoiceupdated to trigger transition to PoS
+	// if genesis block, send forkchoiceUpdated to trigger transition to PoS
 	if header.Number.Cmp(big.NewInt(0)) == 0 {
-		_, err = engineAPI.ForkchoiceUpdatedV1(curForkchoiceState, nil)
-	}
-
-	if err != nil {
-		log.Crit("failed to initiate PoS transition for genesis via Forkchoiceupdated", "err", err)
+		if _, err := engineAPI.ForkchoiceUpdatedV1(curForkchoiceState, nil); err != nil {
+			log.Crit("failed to initiate PoS transition for genesis via Forkchoiceupdated", "err", err)
+		}
 	}
 
 	for {
