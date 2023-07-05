@@ -1172,7 +1172,7 @@ func (p *BlobPool) add(tx *types.Transaction, blobs []kzg4844.Blob, commits []kz
 	case len(txs) == 1: // 1 tx and not a new acc, must be replacement
 		heap.Fix(p.evict, p.evict.index[from])
 
-	case offset == len(txs): // either append or last tx replacement
+	case offset == len(txs)-1: // either append or last tx replacement
 		evictionExecFeeDiff := txs[offset-1].evictionExecFeeJumps - txs[offset].evictionExecFeeJumps
 		evictionBlobFeeDiff := txs[offset-1].evictionBlobFeeJumps - txs[offset].evictionBlobFeeJumps
 
