@@ -288,7 +288,8 @@ type BlobTxShim struct {
 //     minimums will need to be done only starting at the swapped in/out nonce
 //     and leading up to the first no-change.
 type BlobPool struct {
-	config Config // Pool configuration
+	config  Config                 // Pool configuration
+	reserve txpool.AddressReserver // Address reserver to ensure exclusivity across subpools
 
 	store  billy.Database // Persistent data store for the tx metadata and blobs
 	stored uint64         // Useful data size of all transactions on disk
@@ -337,7 +338,9 @@ func (p *BlobPool) Filter(tx *types.Transaction) bool {
 // Init sets the gas price needed to keep a transaction in the pool and the chain
 // head to allow balance / nonce checks. The transaction journal will be loaded
 // from disk and filtered based on the provided starting settings.
-func (p *BlobPool) Init(gasTip *big.Int, head *types.Header) error {
+func (p *BlobPool) Init(gasTip *big.Int, head *types.Header, reserve txpool.AddressReserver) error {
+	p.reserve = reserve
+
 	var (
 		queuedir = filepath.Join(p.config.Datadir, pendingTransactionStore)
 		limbodir = filepath.Join(p.config.Datadir, limboedTransactionStore)
@@ -454,6 +457,9 @@ func (p *BlobPool) parseTransaction(id uint64, size uint32, blob []byte) error {
 		return err
 	}
 	if _, ok := p.index[sender]; !ok {
+		if err := p.reserve(sender, true); err != nil {
+			return err
+		}
 		p.index[sender] = []*blobTxMeta{}
 		p.spent[sender] = new(uint256.Int)
 	}
@@ -507,6 +513,8 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 		if inclusions != nil { // only during reorgs will the heap will be initialized
 			heap.Remove(p.evict, p.evict.index[addr])
 		}
+		p.reserve(addr, false)
+
 		if gapped {
 			log.Warn("Dropping dangling blob transactions", "from", addr, "missing", next, "drop", nonces, "ids", ids)
 		} else {
@@ -631,6 +639,7 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 			if inclusions != nil { // only during reorgs will the heap will be initialized
 				heap.Remove(p.evict, p.evict.index[addr])
 			}
+			p.reserve(addr, false)
 		} else {
 			p.index[addr] = txs
 		}
@@ -868,6 +877,10 @@ func (p *BlobPool) reinject(addr common.Address, tx *types.Transaction) {
 	meta := newBlobTxMeta(id, p.store.Size(id), tx)
 
 	if _, ok := p.index[addr]; !ok {
+		if err := p.reserve(addr, true); err != nil {
+			log.Warn("Failed to reserve account for blob pool", "tx", tx.Hash(), "from", addr, "err", err)
+			return
+		}
 		p.index[addr] = []*blobTxMeta{meta}
 		p.spent[addr] = meta.costCap
 		p.evict.Push(addr)
@@ -920,6 +933,7 @@ func (p *BlobPool) SetGasTip(tip *big.Int) {
 					} else {
 						delete(p.index, addr)
 						delete(p.spent, addr)
+						p.reserve(addr, false)
 					}
 					// Clear out the transactions from the data store
 					log.Warn("Dropping underpriced blob transaction", "from", addr, "rejected", tx.nonce, "tip", tx.execTipCap, "want", tip, "drop", nonces, "ids", ids)
@@ -1064,7 +1078,7 @@ func (p *BlobPool) Add(txs []*txpool.Transaction, local bool, sync bool) []error
 
 // Add inserts a new blob transaction into the pool if it passes validation (both
 // consensus validity and pool restictions).
-func (p *BlobPool) add(tx *types.Transaction, blobs []kzg4844.Blob, commits []kzg4844.Commitment, proofs []kzg4844.Proof) error {
+func (p *BlobPool) add(tx *types.Transaction, blobs []kzg4844.Blob, commits []kzg4844.Commitment, proofs []kzg4844.Proof) (err error) {
 	// The blob pool blocks on adding a transaction. This is because blob txs are
 	// only even pulled form the network, so this method will act as the overload
 	// protection for fetches.
@@ -1082,6 +1096,25 @@ func (p *BlobPool) add(tx *types.Transaction, blobs []kzg4844.Blob, commits []kz
 		log.Trace("Transaction validation failed", "hash", tx.Hash(), "err", err)
 		return err
 	}
+	// If the address is not yet known, request exclusivity to track the account
+	// only by this subpool until all transactions are evicted
+	from, _ := types.Sender(p.signer, tx) // already validated above
+	if _, ok := p.index[from]; !ok {
+		if err := p.reserve(from, true); err != nil {
+			return err
+		}
+		defer func() {
+			// If the transaction is rejected by some post-validation check, remove
+			// the lock on the reservation set.
+			//
+			// Note, `err` here is the named error return, which will be initialized
+			// by a return statement before running deferred methods. Take care with
+			// removing or subscoping err as it will break this clause.
+			if err != nil {
+				p.reserve(from, false)
+			}
+		}()
+	}
 	// Transaction permitted into the pool from a nonce and cost perspective,
 	// insert it into the database and update the indices
 	blob, err := rlp.EncodeToBytes(&blobTx{Tx: tx, Blobs: blobs, Commits: commits, Proofs: proofs})
@@ -1096,10 +1129,9 @@ func (p *BlobPool) add(tx *types.Transaction, blobs []kzg4844.Blob, commits []kz
 	meta := newBlobTxMeta(id, p.store.Size(id), tx)
 
 	var (
-		from, _ = types.Sender(p.signer, tx) // already validated above
-		next    = p.state.GetNonce(from)
-		offset  = int(tx.Nonce() - next)
-		newacc  = false
+		next   = p.state.GetNonce(from)
+		offset = int(tx.Nonce() - next)
+		newacc = false
 	)
 	if len(p.index[from]) > offset {
 		// Transaction replaces a previously queued one
@@ -1217,6 +1249,7 @@ func (p *BlobPool) drop() {
 	if last {
 		delete(p.index, from)
 		delete(p.spent, from)
+		p.reserve(from, false)
 	} else {
 		txs[len(txs)-1] = nil
 		txs = txs[:len(txs)-1]
