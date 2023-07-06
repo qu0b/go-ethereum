@@ -518,7 +518,7 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 		if gapped {
 			log.Warn("Dropping dangling blob transactions", "from", addr, "missing", next, "drop", nonces, "ids", ids)
 		} else {
-			log.Warn("Dropping filled blob transactions", "from", addr, "filled", nonces, "ids", ids)
+			log.Trace("Dropping filled blob transactions", "from", addr, "filled", nonces, "ids", ids)
 		}
 		for _, id := range ids {
 			if err := p.store.Delete(id); err != nil {
@@ -548,7 +548,7 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 			}
 			txs = txs[1:]
 		}
-		log.Warn("Dropping overlapped blob transactions", "from", addr, "overlapped", nonces, "ids", ids, "left", len(txs))
+		log.Trace("Dropping overlapped blob transactions", "from", addr, "overlapped", nonces, "ids", ids, "left", len(txs))
 		for _, id := range ids {
 			if err := p.store.Delete(id); err != nil {
 				log.Error("Failed to delete blob transaction", "from", addr, "id", id, "err", err)
