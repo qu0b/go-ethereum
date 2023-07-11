@@ -31,7 +31,7 @@ type Config struct {
 var DefaultConfig = Config{
 	Datadir:   "blobpool",
 	Datacap:   10 * 1024 * 1024 * 1024,
-	PriceBump: 100, // either have patience or be agressive, no mushy ground
+	PriceBump: 100, // either have patience or be aggressive, no mushy ground
 }
 
 // sanitize checks the provided user configurations and changes anything that's

@@ -18,13 +18,15 @@ package blobpool
 
 import (
 	"container/heap"
-	"math/rand"
+	mrand "math/rand"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
+
+var rnd = mrand.New(mrand.NewSource(1))
 
 // verifyHeapInternals verifies that all accounts present in the index are also
 // present in the heap and internals are consistent across various indices.
@@ -62,7 +64,7 @@ func verifyHeapInternals(t *testing.T, evict *evictHeap) {
 	}
 }
 
-// Tests that the price heap can correcty sort its set of transactions based on
+// Tests that the price heap can correctly sort its set of transactions based on
 // an input base- and blob fee.
 func TestPriceHeapSorting(t *testing.T) {
 	tests := []struct {
@@ -75,7 +77,7 @@ func TestPriceHeapSorting(t *testing.T) {
 
 		order []int
 	}{
-		// If everthing is above the basefee and blobfee, order by miner tip
+		// If everything is above the basefee and blobfee, order by miner tip
 		{
 			execTips: []uint64{1, 0, 2},
 			execFees: []uint64{1, 2, 3},
@@ -108,7 +110,7 @@ func TestPriceHeapSorting(t *testing.T) {
 		},
 		// If both basefee and blobfee is specified, sort by the larger distance
 		// of the two from the current network conditions, splitting same (loglog)
-		// ones via teh tip.
+		// ones via the tip.
 		//
 		// Basefee: 1000
 		// Blobfee: 100
@@ -186,17 +188,17 @@ func benchmarkPriceHeapReinit(b *testing.B, datacap uint64) {
 	// data cap
 	blobs := datacap / (params.BlobTxBytesPerFieldElement * params.BlobTxFieldElementsPerBlob)
 
-	// Create a random set of transactions with random fees. Use a separate account
+	// Create a rndom set of transactions with rndom fees. Use a separate account
 	// for each transaction to make it worse case.
 	index := make(map[common.Address][]*blobTxMeta)
 	for i := 0; i < int(blobs); i++ {
 		var addr common.Address
-		rand.Read(addr[:])
+		rnd.Read(addr[:])
 
 		var (
-			execTip = uint256.NewInt(rand.Uint64())
-			execFee = uint256.NewInt(rand.Uint64())
-			blobFee = uint256.NewInt(rand.Uint64())
+			execTip = uint256.NewInt(rnd.Uint64())
+			execFee = uint256.NewInt(rnd.Uint64())
+			blobFee = uint256.NewInt(rnd.Uint64())
 
 			basefeeJumps = dynamicFeeJumps(execFee)
 			blobfeeJumps = dynamicFeeJumps(blobFee)
@@ -216,13 +218,13 @@ func benchmarkPriceHeapReinit(b *testing.B, datacap uint64) {
 		}}
 	}
 	// Create a price heap and reinit it over and over
-	heap := newPriceHeap(uint256.NewInt(rand.Uint64()), uint256.NewInt(rand.Uint64()), &index)
+	heap := newPriceHeap(uint256.NewInt(rnd.Uint64()), uint256.NewInt(rnd.Uint64()), &index)
 
 	basefees := make([]*uint256.Int, b.N)
 	blobfees := make([]*uint256.Int, b.N)
 	for i := 0; i < b.N; i++ {
-		basefees[i] = uint256.NewInt(rand.Uint64())
-		blobfees[i] = uint256.NewInt(rand.Uint64())
+		basefees[i] = uint256.NewInt(rnd.Uint64())
+		blobfees[i] = uint256.NewInt(rnd.Uint64())
 	}
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -246,17 +248,17 @@ func benchmarkPriceHeapOverflow(b *testing.B, datacap uint64) {
 	// data cap
 	blobs := datacap / (params.BlobTxBytesPerFieldElement * params.BlobTxFieldElementsPerBlob)
 
-	// Create a random set of transactions with random fees. Use a separate account
+	// Create a rndom set of transactions with rndom fees. Use a separate account
 	// for each transaction to make it worse case.
 	index := make(map[common.Address][]*blobTxMeta)
 	for i := 0; i < int(blobs); i++ {
 		var addr common.Address
-		rand.Read(addr[:])
+		rnd.Read(addr[:])
 
 		var (
-			execTip = uint256.NewInt(rand.Uint64())
-			execFee = uint256.NewInt(rand.Uint64())
-			blobFee = uint256.NewInt(rand.Uint64())
+			execTip = uint256.NewInt(rnd.Uint64())
+			execFee = uint256.NewInt(rnd.Uint64())
+			blobFee = uint256.NewInt(rnd.Uint64())
 
 			basefeeJumps = dynamicFeeJumps(execFee)
 			blobfeeJumps = dynamicFeeJumps(blobFee)
@@ -276,18 +278,18 @@ func benchmarkPriceHeapOverflow(b *testing.B, datacap uint64) {
 		}}
 	}
 	// Create a price heap and overflow it over and over
-	evict := newPriceHeap(uint256.NewInt(rand.Uint64()), uint256.NewInt(rand.Uint64()), &index)
+	evict := newPriceHeap(uint256.NewInt(rnd.Uint64()), uint256.NewInt(rnd.Uint64()), &index)
 	var (
 		addrs = make([]common.Address, b.N)
 		metas = make([]*blobTxMeta, b.N)
 	)
 	for i := 0; i < b.N; i++ {
-		rand.Read(addrs[i][:])
+		rnd.Read(addrs[i][:])
 
 		var (
-			execTip = uint256.NewInt(rand.Uint64())
-			execFee = uint256.NewInt(rand.Uint64())
-			blobFee = uint256.NewInt(rand.Uint64())
+			execTip = uint256.NewInt(rnd.Uint64())
+			execFee = uint256.NewInt(rnd.Uint64())
+			blobFee = uint256.NewInt(rnd.Uint64())
 
 			basefeeJumps = dynamicFeeJumps(execFee)
 			blobfeeJumps = dynamicFeeJumps(blobFee)

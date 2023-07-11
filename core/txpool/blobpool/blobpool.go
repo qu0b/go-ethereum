@@ -163,7 +163,7 @@ type BlobTxShim struct {
 //     blob transaction to an existing one should be aggressively discouraged.
 //     Whilst generic transactions can start at 1 Wei gas cost and require a 10%
 //     fee bump to replace, we suggest requiring a higher min cost (e.g. 1 gwei)
-//     and a more agressive bump (100%).
+//     and a more aggressive bump (100%).
 //
 //   - Cancellation is prohibitive. Evicting an already propagated blob tx is a huge
 //     DoS vector. As such, a) replacement (higher-fee) blob txs mustn't invalidate
@@ -195,7 +195,7 @@ type BlobTxShim struct {
 //     either, the engine_newPayload needs to give them to us, and we cache them
 //     until finality to support reorgs without tx losses.
 //
-// Whilst some constraints above might sound overly agressive, the general idea is
+// Whilst some constraints above might sound overly aggressive, the general idea is
 // that the blob pool should work robustly for its intended use case and whilst
 // anyone is free to use blob transactions for arbitrary non-rollup use cases,
 // they should not be allowed to run amok the network.
@@ -378,7 +378,7 @@ func (p *BlobPool) Init(gasTip *big.Int, head *types.Header, reserve txpool.Addr
 	}
 	// Sort the indexed transactions by nonce and delete anything gapped, create
 	// the eviction heap of anyone still standing
-	for addr, _ := range p.index {
+	for addr := range p.index {
 		p.recheck(addr, nil)
 	}
 	var (
@@ -408,7 +408,7 @@ func (p *BlobPool) Init(gasTip *big.Int, head *types.Header, reserve txpool.Addr
 	for p.stored > p.config.Datacap {
 		p.drop()
 	}
-	// Updat the metrics and return the cosntructed pool
+	// Update the metrics and return the constructed pool
 	datacapGauge.Update(int64(p.config.Datacap))
 	p.updateStorageMetrics()
 	return nil
@@ -609,7 +609,7 @@ func (p *BlobPool) recheck(addr common.Address, inclusions map[common.Hash]uint6
 		break
 	}
 	// Ensure that there's no over-draft, this is expected to happen when some
-	// transctions get included without publishing on the network
+	// transactions get included without publishing on the network
 	var (
 		balance = p.state.GetBalance(addr)
 		spent   = p.spent[addr]
@@ -850,7 +850,7 @@ func (p *BlobPool) reorg(oldHead, newHead *types.Header) (map[common.Address][]*
 	return reinject, inclusions
 }
 
-// reinject blindly pushes a transaction previously inlcuded in the chain - and
+// reinject blindly pushes a transaction previously included in the chain - and
 // just reorged out - into the pool. The transaction is assumed valid (having
 // been in the chain), thus the only validation needed is nonce sorting and over-
 // draft checks after injection.
@@ -1148,7 +1148,6 @@ func (p *BlobPool) add(tx *types.Transaction, blobs []kzg4844.Blob, commits []kz
 		delete(p.lookup, prev.hash)
 		p.lookup[meta.hash] = meta.id
 		p.stored += uint64(meta.size) - uint64(prev.size)
-
 	} else {
 		// Transaction extends previously scheduled ones
 		p.index[from] = append(p.index[from], meta)
@@ -1230,10 +1229,10 @@ func (p *BlobPool) add(tx *types.Transaction, blobs []kzg4844.Blob, commits []kz
 	return nil
 }
 
-// drop removes the worst transaction from the pool. It is primarilly used when a
+// drop removes the worst transaction from the pool. It is primarily used when a
 // freshly added transaction overflows the pool and needs to evict something. The
 // method is also called on startup if the user resizes their storage, might be an
-// expensive run but it sould be fine-ish.
+// expensive run but it should be fine-ish.
 func (p *BlobPool) drop() {
 	// Peek at the account with the worse transaction set to evict from (Go's heap
 	// stores the minimum at index zero of the heap slice) and retrieve it's last
@@ -1260,7 +1259,7 @@ func (p *BlobPool) drop() {
 	p.stored -= uint64(drop.size)
 	delete(p.lookup, drop.hash)
 
-	// Remove the transation from the pool's evicion heap:
+	// Remove the transaction from the pool's evicion heap:
 	//   - If the entire account was dropped, pop off the address
 	//   - Otherwise, if the new tail has better eviction caps, fix the heap
 	if last {
