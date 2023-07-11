@@ -94,7 +94,7 @@ type blobTxMeta struct {
 	size uint32      // Byte size in the pool's persistent store
 
 	nonce      uint64       // Needed to prioritize inclusion order within an account
-	costCap    *uint256.Int // Needed to validate cummulative balance sufficiency
+	costCap    *uint256.Int // Needed to validate cumulative balance sufficiency
 	execTipCap *uint256.Int // Needed to prioritize inclusion order across accounts and validate replacement price bump
 	execFeeCap *uint256.Int // Needed to validate replacement price bump
 	blobFeeCap *uint256.Int // Needed to validate replacement price bump
@@ -136,10 +136,10 @@ type BlobTxShim struct {
 //
 // Blob transactions are special snowflakes that are designed for a very specific
 // purpose (rollups) and are expected to adhere to that specific use case. These
-// behavioral expectations allow us to design a transaction pool that is more robust
+// behavioural expectations allow us to design a transaction pool that is more robust
 // (i.e. resending issues) and more resilient to DoS attacks (e.g. replace-flush
-// attacks) than the generic tx pool. These improvemenets will also mean, however,
-// that we enforce a significantly more agressive strategy on entering and exiting
+// attacks) than the generic tx pool. These improvements will also mean, however,
+// that we enforce a significantly more aggressive strategy on entering and exiting
 // the pool:
 //
 //   - Blob transactions are large. With the initial design aiming for 128KB blobs,
@@ -160,14 +160,14 @@ type BlobTxShim struct {
 //     replacement, apart from a potential basefee / miner tip adjustment.
 //
 //   - Replacements are expensive. Given their size, propagating a replacement
-//     blob transaction to an existing one should be agressively discouraged.
+//     blob transaction to an existing one should be aggressively discouraged.
 //     Whilst generic transactions can start at 1 Wei gas cost and require a 10%
 //     fee bump to replace, we suggest requiring a higher min cost (e.g. 1 gwei)
 //     and a more agressive bump (100%).
 //
 //   - Cancellation is prohibitive. Evicting an already propagated blob tx is a huge
 //     DoS vector. As such, a) replacement (higher-fee) blob txs mustn't invalidate
-//     already propagated (future) blob txs (cummulative fee); b) nonce-gapped blob
+//     already propagated (future) blob txs (cumulative fee); b) nonce-gapped blob
 //     txs are disallowed; c) the presence of blob transactions exclude non-blob
 //     transactions.
 //
@@ -180,15 +180,15 @@ type BlobTxShim struct {
 //
 //   - No-blob blob-txs are bad. Theoretically there's no strong reason to disallow
 //     blob txs containing 0 blobs. In practice, admitting such txs into the pool
-//     breaks the low-churn invariant as blob constaints don't apply anymore. Even
-//     though we could accept blocks contaning such txs, a reorg would require moving
+//     breaks the low-churn invariant as blob constraints don't apply anymore. Even
+//     though we could accept blocks containing such txs, a reorg would require moving
 //     them back into the blob pool, which can break invariants.
 //
 //   - Dropping blobs needs delay. When normal transactions are included, they
 //     are immediately evicted from the pool since they are contained in the
 //     including block. Blobs however are not included in the execution chain,
 //     so a mini reorg cannot re-pool "lost" blob transactions. To support reorgs,
-//     blobs are retained on disk until they are finalized.
+//     blobs are retained on disk until they are finalised.
 //
 //   - Blobs can arrive via flashbots. Blocks might contain blob transactions we
 //     have never seen on the network. Since we cannot recover them from blocks
@@ -210,7 +210,7 @@ type BlobTxShim struct {
 //
 //   - When transactions are chosen for inclusion, the primary criteria is the
 //     signer tip (and having a basefee/data fee high enough of course). However,
-//     same-tip tranactions will be split by their basefee/datafee, prefering
+//     same-tip transactions will be split by their basefee/datafee, preferring
 //     those that are closer to the current network limits. The idea being that
 //     very relaxed ones can be included even if the fees go up, when the closer
 //     ones could already be invalid.
@@ -233,7 +233,7 @@ type BlobTxShim struct {
 //     fee cap and data fee cap, there's no singular parameter to create a total
 //     price ordering on. What's more, since the base fee and blob fee can move
 //     independently of one another, there's no pre-defined way to combine them
-//     into a stable order either. This leads to a multi-dimentional problem to
+//     into a stable order either. This leads to a multi-dimensional problem to
 //     solve after every block.
 //
 //   - The first observation is that comparing 1559 base fees or 4844 blob fees
@@ -266,24 +266,24 @@ type BlobTxShim struct {
 //
 //     priority = min(delta-basefee, delta-blobfee)
 //
-//   - The above very agressive dimensionality and noise reduction should result
-//     in transaction being groupped into a small number of buckets, the further
+//   - The above very aggressive dimensionality and noise reduction should result
+//     in transaction being grouped into a small number of buckets, the further
 //     the fees the larger the buckets. This is good because it allows us to use
 //     the miner tip meaningfully as a splitter.
 //
 //   - For the scenario where the pool does not contain non-executable blob txs
 //     anymore, it does not make sense to grant a later eviction priority to txs
 //     with high fee caps since it could enable pool wars. As such, any positive
-//     priority will be groupped together.
+//     priority will be grouped together.
 //
 //     priority = min(delta-basefee, delta-blobfee, 0)
 //
-// Optimization tradeoffs:
+// Optimisation tradeoffs:
 //
 //   - Eviction relies on 3 fee minimums per account (exec tip, exec cap and blob
 //     cap). Maintaining these values across all transactions from the account is
 //     problematic as each transaction replacement or inclusion would require a
-//     rescan of all other transactions to recalcualte the minimum. Instead, the
+//     rescan of all other transactions to recalculate the minimum. Instead, the
 //     pool maintains a rolling minimum across the nonce range. Updating all the
 //     minimums will need to be done only starting at the swapped in/out nonce
 //     and leading up to the first no-change.
@@ -303,7 +303,7 @@ type BlobPool struct {
 	gasTip *uint256.Int   // Currently accepted minimum gas tip
 
 	lookup map[common.Hash]uint64           // Lookup table mapping hashes to tx billy entries
-	index  map[common.Address][]*blobTxMeta // Blob transactions groupped by accounts, sorted by nonce
+	index  map[common.Address][]*blobTxMeta // Blob transactions grouped by accounts, sorted by nonce
 	spent  map[common.Address]*uint256.Int  // Expenditure tracking for individual accounts
 	evict  *evictHeap                       // Heap of cheapest accounts for eviction when full
 
