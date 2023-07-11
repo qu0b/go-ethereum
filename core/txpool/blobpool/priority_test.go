@@ -17,7 +17,6 @@
 package blobpool
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/holiman/uint256"

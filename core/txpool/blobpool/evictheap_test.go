@@ -26,7 +26,7 @@ import (
 	"github.com/holiman/uint256"
 )
 
-var rnd = mrand.New(mrand.NewSource(1))
+var rand = mrand.New(mrand.NewSource(1))
 
 // verifyHeapInternals verifies that all accounts present in the index are also
 // present in the heap and internals are consistent across various indices.
@@ -188,17 +188,17 @@ func benchmarkPriceHeapReinit(b *testing.B, datacap uint64) {
 	// data cap
 	blobs := datacap / (params.BlobTxBytesPerFieldElement * params.BlobTxFieldElementsPerBlob)
 
-	// Create a rndom set of transactions with rndom fees. Use a separate account
+	// Create a random set of transactions with random fees. Use a separate account
 	// for each transaction to make it worse case.
 	index := make(map[common.Address][]*blobTxMeta)
 	for i := 0; i < int(blobs); i++ {
 		var addr common.Address
-		rnd.Read(addr[:])
+		rand.Read(addr[:])
 
 		var (
-			execTip = uint256.NewInt(rnd.Uint64())
-			execFee = uint256.NewInt(rnd.Uint64())
-			blobFee = uint256.NewInt(rnd.Uint64())
+			execTip = uint256.NewInt(rand.Uint64())
+			execFee = uint256.NewInt(rand.Uint64())
+			blobFee = uint256.NewInt(rand.Uint64())
 
 			basefeeJumps = dynamicFeeJumps(execFee)
 			blobfeeJumps = dynamicFeeJumps(blobFee)
@@ -218,13 +218,13 @@ func benchmarkPriceHeapReinit(b *testing.B, datacap uint64) {
 		}}
 	}
 	// Create a price heap and reinit it over and over
-	heap := newPriceHeap(uint256.NewInt(rnd.Uint64()), uint256.NewInt(rnd.Uint64()), &index)
+	heap := newPriceHeap(uint256.NewInt(rand.Uint64()), uint256.NewInt(rand.Uint64()), &index)
 
 	basefees := make([]*uint256.Int, b.N)
 	blobfees := make([]*uint256.Int, b.N)
 	for i := 0; i < b.N; i++ {
-		basefees[i] = uint256.NewInt(rnd.Uint64())
-		blobfees[i] = uint256.NewInt(rnd.Uint64())
+		basefees[i] = uint256.NewInt(rand.Uint64())
+		blobfees[i] = uint256.NewInt(rand.Uint64())
 	}
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -248,17 +248,17 @@ func benchmarkPriceHeapOverflow(b *testing.B, datacap uint64) {
 	// data cap
 	blobs := datacap / (params.BlobTxBytesPerFieldElement * params.BlobTxFieldElementsPerBlob)
 
-	// Create a rndom set of transactions with rndom fees. Use a separate account
+	// Create a random set of transactions with random fees. Use a separate account
 	// for each transaction to make it worse case.
 	index := make(map[common.Address][]*blobTxMeta)
 	for i := 0; i < int(blobs); i++ {
 		var addr common.Address
-		rnd.Read(addr[:])
+		rand.Read(addr[:])
 
 		var (
-			execTip = uint256.NewInt(rnd.Uint64())
-			execFee = uint256.NewInt(rnd.Uint64())
-			blobFee = uint256.NewInt(rnd.Uint64())
+			execTip = uint256.NewInt(rand.Uint64())
+			execFee = uint256.NewInt(rand.Uint64())
+			blobFee = uint256.NewInt(rand.Uint64())
 
 			basefeeJumps = dynamicFeeJumps(execFee)
 			blobfeeJumps = dynamicFeeJumps(blobFee)
@@ -278,18 +278,18 @@ func benchmarkPriceHeapOverflow(b *testing.B, datacap uint64) {
 		}}
 	}
 	// Create a price heap and overflow it over and over
-	evict := newPriceHeap(uint256.NewInt(rnd.Uint64()), uint256.NewInt(rnd.Uint64()), &index)
+	evict := newPriceHeap(uint256.NewInt(rand.Uint64()), uint256.NewInt(rand.Uint64()), &index)
 	var (
 		addrs = make([]common.Address, b.N)
 		metas = make([]*blobTxMeta, b.N)
 	)
 	for i := 0; i < b.N; i++ {
-		rnd.Read(addrs[i][:])
+		rand.Read(addrs[i][:])
 
 		var (
-			execTip = uint256.NewInt(rnd.Uint64())
-			execFee = uint256.NewInt(rnd.Uint64())
-			blobFee = uint256.NewInt(rnd.Uint64())
+			execTip = uint256.NewInt(rand.Uint64())
+			execFee = uint256.NewInt(rand.Uint64())
+			blobFee = uint256.NewInt(rand.Uint64())
 
 			basefeeJumps = dynamicFeeJumps(execFee)
 			blobfeeJumps = dynamicFeeJumps(blobFee)
