@@ -19,6 +19,7 @@ package core
 import (
 	"fmt"
 	"math"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 )
 
 // GasPool tracks the amount of gas available during execution of the transactions
@@ -30,7 +31,13 @@ func (gp *GasPool) AddGas(amount uint64) *GasPool {
 	if uint64(*gp) > math.MaxUint64-amount {
 		panic("gas pool pushed above uint64")
 	}
+	priorValue := uint64(*gp)
 	*(*uint64)(gp) += amount
+	assert.Always(uint64(*gp) == priorValue+amount, "AddGas correct", map[string]interface{}{
+		"priorValue": priorValue,
+		"amount":     amount,
+		"gp":         uint64(*gp),
+	})
 	return gp
 }
 
@@ -40,7 +47,13 @@ func (gp *GasPool) SubGas(amount uint64) error {
 	if uint64(*gp) < amount {
 		return ErrGasLimitReached
 	}
+	priorValue := uint64(*gp)
 	*(*uint64)(gp) -= amount
+	assert.Always(uint64(*gp) == priorValue-amount, "SubGas correct", map[string]interface{}{
+		"priorValue": priorValue,
+		"amount":     amount,
+		"gp":         uint64(*gp),
+	})
 	return nil
 }
 
@@ -54,6 +67,7 @@ func (gp *GasPool) SetGas(gas uint64) {
 	*(*uint64)(gp) = gas
 }
 
+// String returns the string representation of the GasPool.
 func (gp *GasPool) String() string {
 	return fmt.Sprintf("%d", *gp)
 }

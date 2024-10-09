@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -263,6 +264,7 @@ func (c *ChainIndexer) newHead(head uint64, reorg bool) {
 		if stored < c.storedSections {
 			c.setValidSections(stored)
 		}
+		assert.Always(c.knownSections <= c.storedSections, "Known sections should be less than or equal to stored sections after reorg", map[string]any{"knownSections": c.knownSections, "storedSections": c.storedSections})
 		// Update the new head number to the finalized section end and notify children
 		head = known * c.sectionSize
 
@@ -319,6 +321,7 @@ func (c *ChainIndexer) updateLoop() {
 			// Section headers completed (or rolled back), update the index
 			c.lock.Lock()
 			if c.knownSections > c.storedSections {
+				assert.Always(c.knownSections >= c.storedSections, "Known sections should be greater or equal to stored sections", map[string]any{"knownSections": c.knownSections, "storedSections": c.storedSections})
 				// Periodically print an upgrade log message to the user
 				if time.Since(updated) > 8*time.Second {
 					if c.knownSections > c.storedSections+1 {
@@ -329,6 +332,7 @@ func (c *ChainIndexer) updateLoop() {
 				}
 				// Cache the current section count and head to allow unlocking the mutex
 				c.verifyLastHead()
+				assert.Always(c.storedSections <= c.knownSections, "Stored sections should be less than or equal to known sections after verifyLastHead", map[string]any{"storedSections": c.storedSections, "knownSections": c.knownSections})
 				section := c.storedSections
 				var oldHead common.Hash
 				if section > 0 {
@@ -395,6 +399,8 @@ func (c *ChainIndexer) processSection(section uint64, lastHead common.Hash) (com
 		return common.Hash{}, err
 	}
 
+	prevTime := uint64(0)
+
 	for number := section * c.sectionSize; number < (section+1)*c.sectionSize; number++ {
 		hash := rawdb.ReadCanonicalHash(c.chainDb, number)
 		if hash == (common.Hash{}) {
@@ -406,6 +412,12 @@ func (c *ChainIndexer) processSection(section uint64, lastHead common.Hash) (com
 		} else if header.ParentHash != lastHead {
 			return common.Hash{}, errors.New("chain reorged during section processing")
 		}
+
+		assert.Always(header.Number.Uint64() == number, "Header number matches expected number", map[string]any{"headerNumber": header.Number.Uint64(), "expectedNumber": number})
+		assert.Always(header.ParentHash == lastHead, "Header's parent hash matches last head", map[string]any{"headerParentHash": header.ParentHash, "lastHead": lastHead})
+		assert.Always(header.Time >= prevTime, "Header time is non-decreasing", map[string]any{"currentHeaderTime": header.Time, "prevHeaderTime": prevTime})
+		prevTime = header.Time
+
 		if err := c.backend.Process(c.ctx, header); err != nil {
 			return common.Hash{}, err
 		}

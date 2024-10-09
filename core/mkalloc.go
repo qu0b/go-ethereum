@@ -36,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 )
 
 type allocItem struct {
@@ -71,13 +72,21 @@ func makelist(g *core.Genesis) []allocItem {
 			slices.SortFunc(misc.Slots, func(a, b allocItemStorageItem) int {
 				return a.Key.Cmp(b.Key)
 			})
+			for i := 0; i < len(misc.Slots)-1; i++ {
+				assert.Always(misc.Slots[i].Key.Cmp(misc.Slots[i+1].Key) <= 0, "Storage slots are sorted", map[string]any{"index": i})
+			}
 		}
+		assert.Always(account.Balance.Sign() >= 0, "Account balance is non-negative", map[string]any{"address": addr.String(), "balance": account.Balance.String()})
 		bigAddr := new(big.Int).SetBytes(addr.Bytes())
 		items = append(items, allocItem{bigAddr, account.Balance, misc})
 	}
 	slices.SortFunc(items, func(a, b allocItem) int {
 		return a.Addr.Cmp(b.Addr)
 	})
+	for i := 0; i < len(items)-1; i++ {
+		assert.Always(items[i].Addr.Cmp(items[i+1].Addr) <= 0, "Alloc items are sorted", map[string]any{"index": i})
+	}
+	assert.Always(len(items) == len(g.Alloc), "Items length equals Genesis Alloc length", map[string]any{"itemsLength": len(items), "allocLength": len(g.Alloc)})
 	return items
 }
 
@@ -87,6 +96,7 @@ func makealloc(g *core.Genesis) string {
 	if err != nil {
 		panic(err)
 	}
+	assert.Always(len(data) > 0, "RLP encoded data is not empty", map[string]any{"dataLength": len(data)})
 	return strconv.QuoteToASCII(string(data))
 }
 
@@ -95,7 +105,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Usage: mkalloc genesis.json")
 		os.Exit(1)
 	}
-
 	g := new(core.Genesis)
 	file, err := os.Open(os.Args[1])
 	if err != nil {
@@ -105,5 +114,6 @@ func main() {
 	if err := json.NewDecoder(file).Decode(g); err != nil {
 		panic(err)
 	}
+	assert.Always(len(g.Alloc) > 0, "Genesis Alloc is not empty", nil)
 	fmt.Println("const allocData =", makealloc(g))
 }

@@ -19,6 +19,7 @@ package core
 import (
 	"math/big"
 
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
@@ -52,6 +53,14 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 		beneficiary, _ = chain.Engine().Author(header) // Ignore error, we're past header validation
 	} else {
 		beneficiary = *author
+	}
+	zeroAddress := common.Address{}
+	assert.Always(beneficiary != zeroAddress, "Beneficiary address should not be the zero address", nil)
+
+	parentHeader := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
+	if parentHeader != nil {
+		assert.Always(header.Number.Cmp(parentHeader.Number) == 1, "Block number should be increasing", nil)
+		assert.Always(header.Time > parentHeader.Time, "Block timestamp should be increasing", nil)
 	}
 	if header.BaseFee != nil {
 		baseFee = new(big.Int).Set(header.BaseFee)
@@ -118,6 +127,7 @@ func GetHashFn(ref *types.Header, chain ChainContext) func(n uint64) common.Hash
 			if header == nil {
 				break
 			}
+			assert.Always(header.Number.Uint64() == lastKnownNumber, "Header numbers should match expected value", nil)
 			cache = append(cache, header.ParentHash)
 			lastKnownHash = header.ParentHash
 			lastKnownNumber = header.Number.Uint64() - 1
@@ -132,11 +142,19 @@ func GetHashFn(ref *types.Header, chain ChainContext) func(n uint64) common.Hash
 // CanTransfer checks whether there are enough funds in the address' account to make a transfer.
 // This does not take the necessary gas in to account to make the transfer valid.
 func CanTransfer(db vm.StateDB, addr common.Address, amount *uint256.Int) bool {
-	return db.GetBalance(addr).Cmp(amount) >= 0
+	balance := db.GetBalance(addr)
+	assert.Always(balance.Gt(uint256.NewInt(0)) || balance.Eq(uint256.NewInt(0)), "Balance should be non-negative", nil)
+	assert.Always(amount.Gt(uint256.NewInt(0)), "Transfer amount should be positive", nil)
+	return balance.Cmp(amount) >= 0
 }
 
 // Transfer subtracts amount from sender and adds amount to recipient using the given Db
 func Transfer(db vm.StateDB, sender, recipient common.Address, amount *uint256.Int) {
+	assert.Always(amount.Gt(uint256.NewInt(0)), "Transfer amount should be positive", nil)
 	db.SubBalance(sender, amount, tracing.BalanceChangeTransfer)
 	db.AddBalance(recipient, amount, tracing.BalanceChangeTransfer)
+	senderBalanceAfter := db.GetBalance(sender)
+	recipientBalanceAfter := db.GetBalance(recipient)
+	assert.Always(senderBalanceAfter.Gt(uint256.NewInt(0)) || senderBalanceAfter.Eq(uint256.NewInt(0)), "Sender balance should be non-negative after transfer", nil)
+	assert.Always(recipientBalanceAfter.Gt(uint256.NewInt(0)) || recipientBalanceAfter.Eq(uint256.NewInt(0)), "Recipient balance should be non-negative after transfer", nil)
 }

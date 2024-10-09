@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -64,6 +65,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		gp          = new(GasPool).AddGas(block.GasLimit())
 	)
 
+
 	// Mutate the block and state according to any hard-fork specs
 	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
 		misc.ApplyDAOHardFork(statedb)
@@ -95,6 +97,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
+
+		assert.AlwaysLessThanOrEqualTo(*usedGas, block.GasLimit(), "Total used gas <= block gas limit", nil)
 	}
 	// Read requests if Prague is enabled.
 	var requests types.Requests
@@ -137,6 +141,8 @@ func ApplyTransactionWithEVM(msg *Message, config *params.ChainConfig, gp *GasPo
 	if err != nil {
 		return nil, err
 	}
+
+	assert.AlwaysLessThanOrEqualTo(result.UsedGas, msg.GasLimit, "Result used gas <= message gas limit", nil)
 
 	// Update the state with pending changes.
 	var root []byte

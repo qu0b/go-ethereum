@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 )
 
 // ExecutionResult includes all output after executing given evm
@@ -114,6 +115,9 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation, 
 		gas += uint64(len(accessList)) * params.TxAccessListAddressGas
 		gas += uint64(accessList.StorageKeys()) * params.TxAccessListStorageKeyGas
 	}
+
+	assert.Always(gas <= math.MaxUint64, "Gas does not exceed MaxUint64", nil)
+
 	return gas, nil
 }
 
@@ -263,7 +267,14 @@ func (st *StateTransition) buyGas() error {
 	if overflow {
 		return fmt.Errorf("%w: address %v required balance exceeds 256 bits", ErrInsufficientFunds, st.msg.From.Hex())
 	}
-	if have, want := st.state.GetBalance(st.msg.From), balanceCheckU256; have.Cmp(want) < 0 {
+	have := st.state.GetBalance(st.msg.From)
+	want := balanceCheckU256
+	assert.Always(have.Cmp(want) >= 0, "Sender's balance sufficient", map[string]any{
+		"sender": st.msg.From.Hex(),
+		"have":   have.String(),
+		"want":   want.String(),
+	})
+	if have.Cmp(want) < 0 {
 		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From.Hex(), have, want)
 	}
 	if err := st.gp.SubGas(st.msg.GasLimit); err != nil {
@@ -297,10 +308,19 @@ func (st *StateTransition) preCheck() error {
 			return fmt.Errorf("%w: address %v, nonce: %d", ErrNonceMax,
 				msg.From.Hex(), stNonce)
 		}
+		assert.Always(stNonce == msg.Nonce, "Sender's nonce matches message nonce", map[string]any{
+			"sender":   msg.From.Hex(),
+			"msgNonce": msg.Nonce,
+			"stNonce":  stNonce,
+		})
 	}
 	if !msg.SkipFromEOACheck {
 		// Make sure the sender is an EOA
 		codeHash := st.state.GetCodeHash(msg.From)
+		assert.Always(codeHash == (common.Hash{}) || codeHash == types.EmptyCodeHash, "Sender is EOA", map[string]any{
+			"sender":   msg.From.Hex(),
+			"codeHash": codeHash.Hex(),
+		})
 		if codeHash != (common.Hash{}) && codeHash != types.EmptyCodeHash {
 			return fmt.Errorf("%w: address %v, codehash: %s", ErrSenderNoEOA,
 				msg.From.Hex(), codeHash)
@@ -319,12 +339,22 @@ func (st *StateTransition) preCheck() error {
 				return fmt.Errorf("%w: address %v, maxPriorityFeePerGas bit length: %d", ErrTipVeryHigh,
 					msg.From.Hex(), l)
 			}
+			assert.Always(msg.GasFeeCap.Cmp(msg.GasTipCap) >= 0, "Gas fee cap not less than gas tip cap", map[string]any{
+				"sender":       msg.From.Hex(),
+				"gasTipCap":    msg.GasTipCap.String(),
+				"gasFeeCap":    msg.GasFeeCap.String(),
+			})
 			if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
 				return fmt.Errorf("%w: address %v, maxPriorityFeePerGas: %s, maxFeePerGas: %s", ErrTipAboveFeeCap,
 					msg.From.Hex(), msg.GasTipCap, msg.GasFeeCap)
 			}
 			// This will panic if baseFee is nil, but basefee presence is verified
 			// as part of header validation.
+			assert.Always(msg.GasFeeCap.Cmp(st.evm.Context.BaseFee) >= 0, "Gas fee cap not less than base fee", map[string]any{
+				"sender":      msg.From.Hex(),
+				"gasFeeCap":   msg.GasFeeCap.String(),
+				"baseFee":     st.evm.Context.BaseFee.String(),
+			})
 			if msg.GasFeeCap.Cmp(st.evm.Context.BaseFee) < 0 {
 				return fmt.Errorf("%w: address %v, maxFeePerGas: %s, baseFee: %s", ErrFeeCapTooLow,
 					msg.From.Hex(), msg.GasFeeCap, st.evm.Context.BaseFee)
@@ -491,6 +521,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 func (st *StateTransition) refundGas(refundQuotient uint64) uint64 {
 	// Apply refund counter, capped to a refund quotient
 	refund := st.gasUsed() / refundQuotient
+	assert.Always(refund <= st.state.GetRefund(), "Refund not more than state refund", map[string]any{
+		"refund":      refund,
+		"stateRefund": st.state.GetRefund(),
+	})
 	if refund > st.state.GetRefund() {
 		refund = st.state.GetRefund()
 	}

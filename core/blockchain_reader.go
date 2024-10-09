@@ -20,6 +20,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -166,6 +167,15 @@ func (bc *BlockChain) GetBlock(hash common.Hash, number uint64) *types.Block {
 	if block == nil {
 		return nil
 	}
+	// Assert that the block's hash and number match the input
+	assert.Always(block.Hash() == hash, "GetBlock: block hash mismatch", map[string]any{
+		"expectedHash": hash,
+		"actualHash":   block.Hash(),
+	})
+	assert.Always(block.NumberU64() == number, "GetBlock: block number mismatch", map[string]any{
+		"expectedNumber": number,
+		"actualNumber":   block.NumberU64(),
+	})
 	// Cache the found block for next time and return
 	bc.blockCache.Add(block.Hash(), block)
 	return block
@@ -225,6 +235,16 @@ func (bc *BlockChain) GetReceiptsByHash(hash common.Hash) types.Receipts {
 	receipts := rawdb.ReadReceipts(bc.db, hash, *number, header.Time, bc.chainConfig)
 	if receipts == nil {
 		return nil
+	}
+	// Get the block to retrieve the transaction count
+	block := bc.GetBlock(hash, *number)
+	if block != nil {
+		assert.Always(len(receipts) == len(block.Transactions()), "GetReceiptsByHash: receipt count mismatch", map[string]any{
+			"hash":              hash,
+			"number":            *number,
+			"transactionCount":  len(block.Transactions()),
+			"receiptCount":      len(receipts),
+		})
 	}
 	bc.receiptsCache.Add(hash, receipts)
 	return receipts
@@ -320,6 +340,11 @@ func (bc *BlockChain) HasBlockAndState(hash common.Hash, number uint64) bool {
 	if block == nil {
 		return false
 	}
+	// Assert that the block hash matches the input hash
+	assert.Always(block.Hash() == hash, "HasBlockAndState: block hash mismatch", map[string]any{
+		"expectedHash": hash,
+		"actualHash":   block.Hash(),
+	})
 	return bc.HasState(block.Root())
 }
 

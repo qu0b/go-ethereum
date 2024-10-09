@@ -28,6 +28,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/antithesishq/antithesis-sdk-go/assert"
+
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -1451,6 +1454,7 @@ func (bc *BlockChain) writeKnownBlock(block *types.Block) error {
 func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, statedb *state.StateDB) error {
 	// Calculate the total difficulty of the block
 	ptd := bc.GetTd(block.ParentHash(), block.NumberU64()-1)
+	assert.Always(ptd != nil, "Parent total difficulty exists", nil)
 	if ptd == nil {
 		return consensus.ErrUnknownAncestor
 	}
@@ -1469,6 +1473,8 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	if err := blockBatch.Write(); err != nil {
 		log.Crit("Failed to write block into disk", "err", err)
 	}
+	assert.Always(bc.HasBlock(block.Hash(), block.NumberU64()), "Block is written to database", nil)
+
 	// Commit all cached state changes into underlying memory database.
 	root, err := statedb.Commit(block.NumberU64(), bc.chainConfig.IsEIP158(block.Number()))
 	if err != nil {
@@ -1541,6 +1547,8 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 		return NonStatTy, err
 	}
 	currentBlock := bc.CurrentBlock()
+	assert.Always(currentBlock != nil, "Current block is not nil", nil)
+
 
 	// Reorganise the chain if the parent is not the head block
 	if block.ParentHash() != currentBlock.Hash() {
@@ -1582,6 +1590,10 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	// Do a sanity check that the provided chain is actually ordered and linked.
 	for i := 1; i < len(chain); i++ {
 		block, prev := chain[i], chain[i-1]
+
+		assert.Always(block.NumberU64() == prev.NumberU64()+1, "Block numbers are contiguous", map[string]any{"currentBlockNumber": block.NumberU64(), "previousBlockNumber": prev.NumberU64()})
+		assert.Always(block.ParentHash() == prev.Hash(), "Block parents are properly linked", map[string]any{"blockParentHash": block.ParentHash(), "prevHash": prev.Hash()})
+
 		if block.NumberU64() != prev.NumberU64()+1 || block.ParentHash() != prev.Hash() {
 			log.Error("Non contiguous block insert",
 				"number", block.Number(),
@@ -1595,6 +1607,7 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 		}
 	}
 	// Pre-checks passed, start the full block imports
+	assert.Always(!bc.stopping.Load(), "Blockchain is not stopped", nil)
 	if !bc.chainmu.TryLock() {
 		return 0, errChainStopped
 	}
@@ -1881,6 +1894,9 @@ type blockProcessingResult struct {
 // processBlock executes and validates the given block. If there was no error
 // it writes the block and associated state to database.
 func (bc *BlockChain) processBlock(block *types.Block, statedb *state.StateDB, start time.Time, setHead bool) (_ *blockProcessingResult, blockEndErr error) {
+	assert.Always(block != nil, "Block is not nil", nil)
+	assert.Always(statedb != nil, "StateDB is not nil", nil)
+
 	if bc.logger != nil && bc.logger.OnBlockStart != nil {
 		td := bc.GetTd(block.ParentHash(), block.NumberU64()-1)
 		bc.logger.OnBlockStart(tracing.BlockEvent{
@@ -1896,9 +1912,14 @@ func (bc *BlockChain) processBlock(block *types.Block, statedb *state.StateDB, s
 		}()
 	}
 
+	parentHeader := bc.GetHeader(block.ParentHash(), block.NumberU64()-1)
+	assert.Always(parentHeader != nil, "Parent header exists", nil)
+	assert.Always(int64(block.Time()) >= int64(parentHeader.Time), "Block time is not before parent's time", map[string]any{"blockTime": block.Time(), "parentTime": parentHeader.Time})
+
 	// Process block using the parent state as reference point
 	pstart := time.Now()
 	res, err := bc.processor.Process(block, statedb, bc.vmConfig)
+	assert.Always(res != nil, "Processing result is not nil", nil)
 	if err != nil {
 		bc.reportBlock(block, res, err)
 		return nil, err
@@ -2187,6 +2208,8 @@ func (bc *BlockChain) collectLogs(b *types.Block, removed bool) []*types.Log {
 // Note the new head block won't be processed here, callers need to handle it
 // externally.
 func (bc *BlockChain) reorg(oldHead *types.Header, newHead *types.Block) error {
+	assert.Always(oldHead != nil, "Old head is not nil", nil)
+	assert.Always(newHead != nil, "New head is not nil", nil)
 	var (
 		newChain    types.Blocks
 		oldChain    types.Blocks
@@ -2196,6 +2219,7 @@ func (bc *BlockChain) reorg(oldHead *types.Header, newHead *types.Block) error {
 		addedTxs   []common.Hash
 	)
 	oldBlock := bc.GetBlock(oldHead.Hash(), oldHead.Number.Uint64())
+	assert.Always(oldBlock != nil, "Old head block exists", nil)
 	if oldBlock == nil {
 		return errors.New("current head block missing")
 	}
@@ -2487,6 +2511,13 @@ func summarizeBadBlock(block *types.Block, receipts []*types.Receipt, config *pa
 	if vcs != "" {
 		vcs = fmt.Sprintf("\nVCS: %s", vcs)
 	}
+
+	assert.Unreachable("Bad Block", map[string]any{
+		"number": block.Number(),
+		"hash": block.Hash(),
+		"err": err,
+	});
+
 	return fmt.Sprintf(`
 ########## BAD BLOCK #########
 Block: %v (%#x)

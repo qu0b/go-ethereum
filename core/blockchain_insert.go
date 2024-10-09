@@ -19,6 +19,7 @@ package core
 import (
 	"time"
 
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -40,21 +41,26 @@ const statsReportLimit = 8 * time.Second
 // report prints statistics if some number of blocks have been processed
 // or more than a few seconds have passed since the last message.
 func (st *insertStats) report(chain []*types.Block, index int, snapDiffItems, snapBufItems, trieDiffNodes, triebufNodes common.StorageSize, setHead bool) {
+	assert.Always(len(chain) > 0, "Chain is not empty", nil)
 	// Fetch the timings for the batch
 	var (
 		now     = mclock.Now()
 		elapsed = now.Sub(st.startTime)
 	)
+	assert.Always(elapsed >= 0, "Elapsed time is non-negative", nil)
 	// If we're at the last block of the batch or report period reached, log
 	if index == len(chain)-1 || elapsed >= statsReportLimit {
 		// Count the number of transactions in this segment
 		var txs int
-		for _, block := range chain[st.lastIndex : index+1] {
+		assert.Always(st.lastIndex >= 0 && st.lastIndex <= index+1, "LastIndex within range", map[string]any{"lastIndex": st.lastIndex, "index": index})
+		blockRange := chain[st.lastIndex : index+1]
+		for _, block := range blockRange {
+			assert.Always(block != nil, "Block is not nil", nil)
 			txs += len(block.Transactions())
 		}
 		end := chain[index]
-
-		// Assemble the log context and send it to the logger
+		assert.Always(end != nil, "End block is not nil", nil)
+		assert.Always(elapsed > 0, "Elapsed time is greater than zero for mgasps calculation", nil)
 		context := []interface{}{
 			"number", end.Number(), "hash", end.Hash(),
 			"blocks", st.processed, "txs", txs, "mgas", float64(st.usedGas) / 1000000,
@@ -104,6 +110,14 @@ type insertIterator struct {
 // newInsertIterator creates a new iterator based on the given blocks, which are
 // assumed to be a contiguous chain.
 func newInsertIterator(chain types.Blocks, results <-chan error, validator Validator) *insertIterator {
+	assert.Always(chain != nil, "Chain is not nil", nil)
+	assert.Always(results != nil, "Results channel is not nil", nil)
+	// Verify that the chain is contiguous
+	for i := 1; i < len(chain); i++ {
+		parentHash := chain[i].Header().ParentHash
+		prevHash := chain[i-1].Header().Hash()
+		assert.Always(parentHash == prevHash, "Chain is contiguous", map[string]any{"index": i})
+	}
 	return &insertIterator{
 		chain:     chain,
 		results:   results,
@@ -119,17 +133,25 @@ func (it *insertIterator) next() (*types.Block, error) {
 	// If we reached the end of the chain, abort
 	if it.index+1 >= len(it.chain) {
 		it.index = len(it.chain)
+		assert.Always(it.index == len(it.chain), "Index equals chain length", nil)
 		return nil, nil
 	}
 	// Advance the iterator and wait for verification result if not yet done
 	it.index++
+	assert.Always(it.index >= 0 && it.index < len(it.chain), "Index within chain bounds", map[string]any{"index": it.index, "chainLength": len(it.chain)})
+
 	if len(it.errors) <= it.index {
 		it.errors = append(it.errors, <-it.results)
 	}
+	assert.Always(len(it.errors) > it.index, "Errors array has entry for current index", map[string]any{"errorsLength": len(it.errors), "index": it.index})
+
 	if it.errors[it.index] != nil {
+		assert.Always(it.chain[it.index] != nil, "Block at index is not nil", nil)
 		return it.chain[it.index], it.errors[it.index]
 	}
 	// Block header valid, run body validation and return
+	assert.Always(it.chain[it.index] != nil, "Block at index is not nil", nil)
+	assert.Always(it.validator != nil, "Validator is not nil", nil)
 	return it.chain[it.index], it.validator.ValidateBody(it.chain[it.index])
 }
 
@@ -143,11 +165,14 @@ func (it *insertIterator) peek() (*types.Block, error) {
 	if it.index+1 >= len(it.chain) {
 		return nil, nil
 	}
+	assert.Always(it.index+1 >= 0 && it.index+1 < len(it.chain), "Index+1 within chain bounds", map[string]any{"index": it.index + 1, "chainLength": len(it.chain)})
 	// Wait for verification result if not yet done
 	if len(it.errors) <= it.index+1 {
 		it.errors = append(it.errors, <-it.results)
 	}
+	assert.Always(len(it.errors) > it.index+1, "Errors array has entry for peek index", map[string]any{"errorsLength": len(it.errors), "peekIndex": it.index + 1})
 	if it.errors[it.index+1] != nil {
+		assert.Always(it.chain[it.index+1] != nil, "Next block is not nil", nil)
 		return it.chain[it.index+1], it.errors[it.index+1]
 	}
 	// Block header valid, ignore body validation since we don't have a parent anyway

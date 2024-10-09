@@ -23,6 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/consensus"
@@ -201,6 +202,10 @@ func (hc *HeaderChain) WriteHeaders(headers []*types.Header) (int, error) {
 	if ptd == nil {
 		return 0, consensus.ErrUnknownAncestor
 	}
+	parent := hc.GetHeader(headers[0].ParentHash, headers[0].Number.Uint64()-1)
+	if parent == nil {
+		return 0, consensus.ErrUnknownAncestor
+	}
 	var (
 		newTD       = new(big.Int).Set(ptd) // Total difficulty of inserted chain
 		inserted    []rawdb.NumberHash      // Ephemeral lookup of number/hash for the chain
@@ -209,9 +214,6 @@ func (hc *HeaderChain) WriteHeaders(headers []*types.Header) (int, error) {
 	)
 	for i, header := range headers {
 		var hash common.Hash
-		// The headers have already been validated at this point, so we already
-		// know that it's a contiguous chain, where
-		// headers[i].Hash() == headers[i+1].ParentHash
 		if i < len(headers)-1 {
 			hash = headers[i+1].ParentHash
 		} else {
@@ -220,8 +222,16 @@ func (hc *HeaderChain) WriteHeaders(headers []*types.Header) (int, error) {
 		number := header.Number.Uint64()
 		newTD.Add(newTD, header.Difficulty)
 
-		// If the parent was not present, store it
-		// If the header is already known, skip it, otherwise store
+		assert.Always(header.Difficulty.Sign() >= 0, "Header difficulty must be non-negative", map[string]any{"headerNumber": header.Number.Uint64(), "difficulty": header.Difficulty})
+		assert.Always(header.Number.Uint64() == parent.Number.Uint64()+1, "Header number must be parent number + 1", map[string]any{
+			"headerNumber": header.Number.Uint64(),
+			"parentNumber": parent.Number.Uint64(),
+		})
+		assert.Always(header.Time > parent.Time, "Header timestamp must be greater than parent timestamp", map[string]any{
+			"headerTime": header.Time,
+			"parentTime": parent.Time,
+		})
+
 		alreadyKnown := parentKnown && hc.HasHeader(hash, number)
 		if !alreadyKnown {
 			// Irrelevant of the canonical status, write the TD and header to the database.
@@ -234,6 +244,8 @@ func (hc *HeaderChain) WriteHeaders(headers []*types.Header) (int, error) {
 			hc.numberCache.Add(hash, number)
 		}
 		parentKnown = alreadyKnown
+		parent = header
+		ptd = new(big.Int).Set(newTD)
 	}
 	// Skip the slow disk write of all headers if interrupted.
 	if hc.procInterrupt() {
@@ -286,6 +298,14 @@ func (hc *HeaderChain) writeHeadersAndSetHead(headers []*types.Header) (*headerW
 func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header) (int, error) {
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {
+		assert.Always(chain[i].Number.Uint64() == chain[i-1].Number.Uint64()+1, "Headers must be contiguous", map[string]any{
+			"currentNumber":  chain[i].Number.Uint64(),
+			"previousNumber": chain[i-1].Number.Uint64(),
+		})
+		assert.Always(chain[i].ParentHash == chain[i-1].Hash(), "Headers must be linked", map[string]any{
+			"currentParentHash": chain[i].ParentHash,
+			"previousHash":      chain[i-1].Hash(),
+		})
 		if chain[i].Number.Uint64() != chain[i-1].Number.Uint64()+1 {
 			hash := chain[i].Hash()
 			parentHash := chain[i-1].Hash()
@@ -310,6 +330,11 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header) (int, error) {
 		}
 		// Otherwise wait for headers checks and ensure they pass
 		if err := <-results; err != nil {
+			assert.Always(err == nil, "Header verification should not fail", map[string]any{
+				"headerNumber": chain[i].Number.Uint64(),
+				"headerHash":   chain[i].Hash(),
+				"error":        err,
+			})
 			return i, err
 		}
 	}

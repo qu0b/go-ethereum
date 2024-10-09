@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
@@ -53,6 +54,8 @@ type txIndexer struct {
 
 // newTxIndexer initializes the transaction indexer.
 func newTxIndexer(limit uint64, chain *BlockChain) *txIndexer {
+	assert.Always(chain != nil, "Chain must not be nil", nil)
+	assert.Always(chain.db != nil, "Chain db must not be nil", nil)
 	indexer := &txIndexer{
 		limit:    limit,
 		db:       chain.db,
@@ -91,6 +94,7 @@ func (indexer *txIndexer) run(tail *uint64, head uint64, stop chan struct{}, don
 		if indexer.limit != 0 && head >= indexer.limit {
 			from = head - indexer.limit + 1
 		}
+		assert.Always(from <= head+1, "Indexing range from must be <= head+1", map[string]interface{}{"from": from, "head": head})
 		rawdb.IndexTransactions(indexer.db, from, head+1, stop, true)
 		return
 	}
@@ -105,6 +109,7 @@ func (indexer *txIndexer) run(tail *uint64, head uint64, stop chan struct{}, don
 			if end > head+1 {
 				end = head + 1
 			}
+			assert.Always(end <= head+1, "End must be <= head + 1", map[string]interface{}{"end": end, "head": head})
 			rawdb.IndexTransactions(indexer.db, 0, end, stop, true)
 		}
 		return
@@ -113,9 +118,12 @@ func (indexer *txIndexer) run(tail *uint64, head uint64, stop chan struct{}, don
 	// limit and the latest chain head.
 	if head-indexer.limit+1 < *tail {
 		// Reindex a part of missing indices and rewind index tail to HEAD-limit
-		rawdb.IndexTransactions(indexer.db, head-indexer.limit+1, *tail, stop, true)
+		start := head - indexer.limit + 1
+		assert.Always(start < *tail, "Start must be less than tail", map[string]interface{}{"start": start, "tail": *tail})
+		rawdb.IndexTransactions(indexer.db, start, *tail, stop, true)
 	} else {
 		// Unindex a part of stale indices and forward index tail to HEAD-limit
+		assert.Always(*tail <= head-indexer.limit+1, "Tail must be <= head - limit + 1", map[string]interface{}{"tail": *tail, "head": head, "limit": indexer.limit})
 		rawdb.UnindexTransactions(indexer.db, *tail, head-indexer.limit+1, stop, false)
 	}
 }
@@ -158,6 +166,9 @@ func (indexer *txIndexer) loop(chain *BlockChain) {
 			stop = nil
 			done = nil
 			lastTail = rawdb.ReadTxIndexTail(indexer.db)
+			if lastTail != nil {
+				assert.Always(*lastTail <= lastHead+1, "lastTail must not be ahead of lastHead+1", map[string]interface{}{"lastTail": *lastTail, "lastHead": lastHead})
+			}
 		case ch := <-indexer.progress:
 			ch <- indexer.report(lastHead, lastTail)
 		case ch := <-indexer.term:

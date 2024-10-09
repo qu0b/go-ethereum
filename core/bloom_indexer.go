@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/bitutil"
 	"github.com/ethereum/go-ethereum/core/bloombits"
@@ -47,6 +48,7 @@ type BloomIndexer struct {
 // NewBloomIndexer returns a chain indexer that generates bloom bits data for the
 // canonical chain for fast logs filtering.
 func NewBloomIndexer(db ethdb.Database, size, confirms uint64) *ChainIndexer {
+	assert.Always(db != nil, "Database should not be nil", nil)
 	backend := &BloomIndexer{
 		db:   db,
 		size: size,
@@ -59,6 +61,7 @@ func NewBloomIndexer(db ethdb.Database, size, confirms uint64) *ChainIndexer {
 // Reset implements core.ChainIndexerBackend, starting a new bloombits index
 // section.
 func (b *BloomIndexer) Reset(ctx context.Context, section uint64, lastSectionHead common.Hash) error {
+	assert.Always(b.size > 0, "Section size should be greater than zero", nil)
 	gen, err := bloombits.NewGenerator(uint(b.size))
 	b.gen, b.section, b.head = gen, section, common.Hash{}
 	return err
@@ -67,7 +70,14 @@ func (b *BloomIndexer) Reset(ctx context.Context, section uint64, lastSectionHea
 // Process implements core.ChainIndexerBackend, adding a new header's bloom into
 // the index.
 func (b *BloomIndexer) Process(ctx context.Context, header *types.Header) error {
-	b.gen.AddBloom(uint(header.Number.Uint64()-b.section*b.size), header.Bloom)
+	assert.Always(header != nil, "Header should not be nil", nil)
+	assert.Always(b.gen != nil, "Generator should not be nil", nil)
+	headerNumber := header.Number.Uint64()
+	sectionStart := b.section * b.size
+	assert.Always(headerNumber >= sectionStart, "Header number should be >= section start", nil)
+	index := headerNumber - sectionStart
+	assert.Always(index < b.size, "Index should be less than section size", nil)
+	b.gen.AddBloom(uint(index), header.Bloom)
 	b.head = header.Hash()
 	return nil
 }
@@ -75,12 +85,14 @@ func (b *BloomIndexer) Process(ctx context.Context, header *types.Header) error 
 // Commit implements core.ChainIndexerBackend, finalizing the bloom section and
 // writing it out into the database.
 func (b *BloomIndexer) Commit() error {
-	batch := b.db.NewBatchWithSize((int(b.size) / 8) * types.BloomBitLength)
+	assert.Always(b.gen != nil, "Generator should not be nil", nil)
+	batch := b.db.NewBatchWithSize((int(b.size)/8)*types.BloomBitLength)
 	for i := 0; i < types.BloomBitLength; i++ {
 		bits, err := b.gen.Bitset(uint(i))
 		if err != nil {
 			return err
 		}
+		assert.Always(bits != nil, "Bits should not be nil", nil)
 		rawdb.WriteBloomBits(batch, uint(i), b.section, b.head, bitutil.CompressBytes(bits))
 	}
 	return batch.Write()

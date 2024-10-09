@@ -19,6 +19,7 @@ package core
 import (
 	"runtime"
 
+	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -61,6 +62,7 @@ func newTxSenderCacher(threads int) *txSenderCacher {
 // data structures.
 func (cacher *txSenderCacher) cache() {
 	for task := range cacher.tasks {
+		assert.Always(task.inc > 0, "Task increment should be greater than zero", nil)
 		for i := 0; i < len(task.txs); i += task.inc {
 			types.Sender(task.signer, task.txs[i])
 		}
@@ -80,6 +82,7 @@ func (cacher *txSenderCacher) Recover(signer types.Signer, txs []*types.Transact
 	if len(txs) < tasks*4 {
 		tasks = (len(txs) + 3) / 4
 	}
+	assert.Always(tasks >= 1, "Number of tasks should be at least 1", nil)
 	for i := 0; i < tasks; i++ {
 		cacher.tasks <- &txSenderCacherRequest{
 			signer: signer,
@@ -101,5 +104,6 @@ func (cacher *txSenderCacher) RecoverFromBlocks(signer types.Signer, blocks []*t
 	for _, block := range blocks {
 		txs = append(txs, block.Transactions()...)
 	}
+	assert.Always(len(txs) == count, "Transaction count mismatch", map[string]any{"expected": count, "actual": len(txs)})
 	cacher.Recover(signer, txs)
 }
