@@ -16,7 +16,7 @@ RUN cd /go-ethereum && go mod download
 ADD . /go-ethereum
 RUN go install github.com/antithesishq/antithesis-sdk-go/tools/antithesis-go-instrumentor@latest
 # breaks if I uncomment this
-# RUN antithesis-go-instrumentor -assert_only /go-ethereum
+RUN antithesis-go-instrumentor -assert_only -catalog_dir=/go-ethereum/cmd/geth /go-ethereum
 RUN cd /go-ethereum && go run build/ci.go install -static ./cmd/geth
 
 # Pull Geth into a second stage deploy alpine container
