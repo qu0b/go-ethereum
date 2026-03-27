@@ -74,17 +74,23 @@ func (gp *GasPool) ReturnGas(returned uint64, gasUsed uint64) error {
 }
 
 // ReturnGasAmsterdam handles 2D gas accounting for Amsterdam (EIP-8037).
-// It undoes the SubGas deduction fully and accumulates per-dimension block totals.
+// Block validity requires max(sum_regular, sum_state) <= gas_limit, so the
+// pool's remaining capacity reflects the 2D maximum rather than the 1D sum.
 func (gp *GasPool) ReturnGasAmsterdam(returned, txRegular, txState, receiptGasUsed uint64) error {
-	if gp.remaining > math.MaxUint64-returned {
-		return fmt.Errorf("%w: remaining: %d, returned: %d", ErrGasLimitOverflow, gp.remaining, returned)
-	}
-	// Undo SubGas deduction fully (Amsterdam uses cumulative tracking)
-	gp.remaining += returned
-	// Accumulate 2D block dimensions
+	// Accumulate per-dimension block totals.
 	gp.cumulativeRegular += txRegular
 	gp.cumulativeState += txState
 	gp.cumulativeUsed += receiptGasUsed
+
+	// EIP-8037 2D gas: remaining = initial - max(cumulativeRegular, cumulativeState).
+	// This ensures SubGas correctly gates the next tx against 2D block capacity
+	// rather than the 1D sum of regular+state gas consumed.
+	blockUsed := max(gp.cumulativeRegular, gp.cumulativeState)
+	if gp.initial < blockUsed {
+		return fmt.Errorf("%w: block gas overflow: initial %d, used %d (regular: %d, state: %d)",
+			ErrGasLimitReached, gp.initial, blockUsed, gp.cumulativeRegular, gp.cumulativeState)
+	}
+	gp.remaining = gp.initial - blockUsed
 	return nil
 }
 
