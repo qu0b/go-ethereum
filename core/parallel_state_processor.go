@@ -217,7 +217,7 @@ func (p *ParallelStateProcessor) resultHandler(block *types.Block, preTxReads ba
 					// short-circuit if invalid block was detected
 					if res.err != nil {
 						execErr = res.err
-					} else if err := gp.SubGas(res.receipt.CumulativeGasUsed); err != nil {
+					} else if err := gp.SubGas(max(res.txRegular, res.txState)); err != nil {
 						execErr = err
 					} else {
 						results = append(results, res)
