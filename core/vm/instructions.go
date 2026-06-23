@@ -943,10 +943,15 @@ func opSelfdestruct6780(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, erro
 	)
 	// Contract is new and will actually be deleted.
 	if newContract {
-		if this != beneficiary { // Skip no-op transfer when self-destructing to self.
+		if this != beneficiary {
+			// Transfer balance to beneficiary and burn from this account.
 			evm.StateDB.AddBalance(beneficiary, balance, tracing.BalanceIncreaseSelfdestruct)
+			evm.StateDB.SubBalance(this, balance, tracing.BalanceDecreaseSelfdestruct)
+		} else if !evm.chainRules.IsAmsterdam {
+			// Pre-Amsterdam: burn ETH when self-destructing to self (SubBalance without AddBalance).
+			// EIP-8246 (Amsterdam): skip the burn — balance is preserved at finalization.
+			evm.StateDB.SubBalance(this, balance, tracing.BalanceDecreaseSelfdestruct)
 		}
-		evm.StateDB.SubBalance(this, balance, tracing.BalanceDecreaseSelfdestruct)
 		evm.StateDB.SelfDestruct(this)
 	}
 
@@ -959,7 +964,8 @@ func opSelfdestruct6780(pc *uint64, evm *EVM, scope *ScopeContext) ([]byte, erro
 		if this != beneficiary {
 			evm.StateDB.AddLog(types.EthTransferLog(this, beneficiary, balance))
 		} else if newContract {
-			evm.StateDB.AddLog(types.EthBurnLog(this, balance))
+			// EIP-8246: no burn log emitted for same-tx selfdestruct-to-self.
+			// Pre-Amsterdam: evm.StateDB.AddLog(types.EthBurnLog(this, balance))
 		}
 	}
 

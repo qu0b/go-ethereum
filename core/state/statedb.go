@@ -135,6 +135,11 @@ type StateDB struct {
 	// Block access index (0 for pre-execution, 1..n for transactions, n+1 for post-execution)
 	blockAccessIndex uint32
 
+	// isAmsterdam is set during Prepare() when Amsterdam rules are active.
+	// Used by Finalise() to apply EIP-8246: selfdestructed newContracts have
+	// code/storage/nonce cleared but balance preserved instead of being deleted.
+	isAmsterdam bool
+
 	// Transient storage
 	transientStorage transientStorage
 
@@ -829,6 +834,24 @@ func (s *StateDB) Finalise(deleteEmptyObjects bool) *bal.ConstructionBlockAccess
 			// finalise or delete, so ignore it here.
 			continue
 		}
+		// EIP-8246 (Amsterdam): selfdestructed newContracts preserve their balance.
+		// Instead of deleting the account, clear code/storage/nonce; EIP-161 then
+		// removes it if the resulting balance is zero.
+		if s.isAmsterdam && obj.selfDestructed {
+			// Clear code (nonce was reset by setNonce below; storage cleared via dirtyStorage).
+			obj.setCode(types.EmptyCodeHash, nil)
+			obj.setNonce(0)
+			// Zero-out all dirty and pending storage (the contract was just created in
+			// this tx so all storage is in-memory and not yet committed to the trie).
+			for key := range obj.dirtyStorage {
+				obj.dirtyStorage[key] = common.Hash{}
+			}
+			for key := range obj.pendingStorage {
+				obj.pendingStorage[key] = common.Hash{}
+			}
+			obj.uncommittedStorage = make(Storage)
+			obj.selfDestructed = false // redirect to the normal update path
+		}
 		if obj.selfDestructed || (deleteEmptyObjects && obj.empty()) {
 			delete(s.stateObjects, obj.address)
 			s.markDelete(addr)
@@ -1494,6 +1517,7 @@ func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, d
 	if rules.IsAmsterdam {
 		s.stateAccessList = bal.NewConstructionBlockAccessList()
 	}
+	s.isAmsterdam = rules.IsAmsterdam
 }
 
 // AddAddressToAccessList adds the given address to the access list
