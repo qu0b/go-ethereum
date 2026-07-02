@@ -63,6 +63,9 @@ type Receipt struct {
 	TxHash            common.Hash    `json:"transactionHash" gencodec:"required"`
 	ContractAddress   common.Address `json:"contractAddress"`
 	GasUsed           uint64         `json:"gasUsed" gencodec:"required"`
+	RegularGasUsed uint64         `json:"regularGasUsed,omitempty"`
+	StateGasUsed   uint64         `json:"stateGasUsed,omitempty"`
+	GasRefund      uint64         `json:"gasRefund,omitempty"`
 	EffectiveGasPrice *big.Int       `json:"effectiveGasPrice"` // required, but tag omitted for backwards compatibility
 	BlobGasUsed       uint64         `json:"blobGasUsed,omitempty"`
 	BlobGasPrice      *big.Int       `json:"blobGasPrice,omitempty"`
@@ -80,6 +83,9 @@ type receiptMarshaling struct {
 	Status            hexutil.Uint64
 	CumulativeGasUsed hexutil.Uint64
 	GasUsed           hexutil.Uint64
+	RegularGasUsed hexutil.Uint64
+	StateGasUsed   hexutil.Uint64
+	GasRefund      hexutil.Uint64
 	EffectiveGasPrice *hexutil.Big
 	BlobGasUsed       hexutil.Uint64
 	BlobGasPrice      *hexutil.Big

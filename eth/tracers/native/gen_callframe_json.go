@@ -16,25 +16,31 @@ var _ = (*callFrameMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (c callFrame) MarshalJSON() ([]byte, error) {
 	type callFrame0 struct {
-		Type         vm.OpCode       `json:"-"`
-		From         common.Address  `json:"from"`
-		Gas          hexutil.Uint64  `json:"gas"`
-		GasUsed      hexutil.Uint64  `json:"gasUsed"`
-		To           *common.Address `json:"to,omitempty" rlp:"optional"`
-		Input        hexutil.Bytes   `json:"input" rlp:"optional"`
-		Output       hexutil.Bytes   `json:"output,omitempty" rlp:"optional"`
-		Error        string          `json:"error,omitempty" rlp:"optional"`
-		RevertReason string          `json:"revertReason,omitempty"`
-		Calls        []callFrame     `json:"calls,omitempty" rlp:"optional"`
-		Logs         []callLog       `json:"logs,omitempty" rlp:"optional"`
-		Value        *hexutil.Big    `json:"value,omitempty" rlp:"optional"`
-		TypeString   string          `json:"type"`
+		Type           vm.OpCode       `json:"-"`
+		From           common.Address  `json:"from"`
+		Gas            hexutil.Uint64  `json:"gas"`
+		GasUsed        hexutil.Uint64  `json:"gasUsed"`
+		RegularGasUsed hexutil.Uint64  `json:"regularGasUsed,omitempty"`
+		StateGasUsed   hexutil.Uint64  `json:"stateGasUsed,omitempty"`
+		GasRefund      hexutil.Uint64  `json:"gasRefund,omitempty"`
+		To             *common.Address `json:"to,omitempty" rlp:"optional"`
+		Input          hexutil.Bytes   `json:"input" rlp:"optional"`
+		Output         hexutil.Bytes   `json:"output,omitempty" rlp:"optional"`
+		Error          string          `json:"error,omitempty" rlp:"optional"`
+		RevertReason   string          `json:"revertReason,omitempty"`
+		Calls          []callFrame     `json:"calls,omitempty" rlp:"optional"`
+		Logs           []callLog       `json:"logs,omitempty" rlp:"optional"`
+		Value          *hexutil.Big    `json:"value,omitempty" rlp:"optional"`
+		TypeString     string          `json:"type"`
 	}
 	var enc callFrame0
 	enc.Type = c.Type
 	enc.From = c.From
 	enc.Gas = hexutil.Uint64(c.Gas)
 	enc.GasUsed = hexutil.Uint64(c.GasUsed)
+	enc.RegularGasUsed = hexutil.Uint64(c.RegularGasUsed)
+	enc.StateGasUsed = hexutil.Uint64(c.StateGasUsed)
+	enc.GasRefund = hexutil.Uint64(c.GasRefund)
 	enc.To = c.To
 	enc.Input = c.Input
 	enc.Output = c.Output
@@ -50,18 +56,21 @@ func (c callFrame) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals from JSON.
 func (c *callFrame) UnmarshalJSON(input []byte) error {
 	type callFrame0 struct {
-		Type         *vm.OpCode      `json:"-"`
-		From         *common.Address `json:"from"`
-		Gas          *hexutil.Uint64 `json:"gas"`
-		GasUsed      *hexutil.Uint64 `json:"gasUsed"`
-		To           *common.Address `json:"to,omitempty" rlp:"optional"`
-		Input        *hexutil.Bytes  `json:"input" rlp:"optional"`
-		Output       *hexutil.Bytes  `json:"output,omitempty" rlp:"optional"`
-		Error        *string         `json:"error,omitempty" rlp:"optional"`
-		RevertReason *string         `json:"revertReason,omitempty"`
-		Calls        []callFrame     `json:"calls,omitempty" rlp:"optional"`
-		Logs         []callLog       `json:"logs,omitempty" rlp:"optional"`
-		Value        *hexutil.Big    `json:"value,omitempty" rlp:"optional"`
+		Type           *vm.OpCode      `json:"-"`
+		From           *common.Address `json:"from"`
+		Gas            *hexutil.Uint64 `json:"gas"`
+		GasUsed        *hexutil.Uint64 `json:"gasUsed"`
+		RegularGasUsed *hexutil.Uint64 `json:"regularGasUsed,omitempty"`
+		StateGasUsed   *hexutil.Uint64 `json:"stateGasUsed,omitempty"`
+		GasRefund      *hexutil.Uint64 `json:"gasRefund,omitempty"`
+		To             *common.Address `json:"to,omitempty" rlp:"optional"`
+		Input          *hexutil.Bytes  `json:"input" rlp:"optional"`
+		Output         *hexutil.Bytes  `json:"output,omitempty" rlp:"optional"`
+		Error          *string         `json:"error,omitempty" rlp:"optional"`
+		RevertReason   *string         `json:"revertReason,omitempty"`
+		Calls          []callFrame     `json:"calls,omitempty" rlp:"optional"`
+		Logs           []callLog       `json:"logs,omitempty" rlp:"optional"`
+		Value          *hexutil.Big    `json:"value,omitempty" rlp:"optional"`
 	}
 	var dec callFrame0
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -78,6 +87,15 @@ func (c *callFrame) UnmarshalJSON(input []byte) error {
 	}
 	if dec.GasUsed != nil {
 		c.GasUsed = uint64(*dec.GasUsed)
+	}
+	if dec.RegularGasUsed != nil {
+		c.RegularGasUsed = uint64(*dec.RegularGasUsed)
+	}
+	if dec.StateGasUsed != nil {
+		c.StateGasUsed = uint64(*dec.StateGasUsed)
+	}
+	if dec.GasRefund != nil {
+		c.GasRefund = uint64(*dec.GasRefund)
 	}
 	if dec.To != nil {
 		c.To = dec.To

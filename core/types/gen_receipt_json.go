@@ -25,6 +25,9 @@ func (r Receipt) MarshalJSON() ([]byte, error) {
 		TxHash            common.Hash    `json:"transactionHash" gencodec:"required"`
 		ContractAddress   common.Address `json:"contractAddress"`
 		GasUsed           hexutil.Uint64 `json:"gasUsed" gencodec:"required"`
+		RegularGasUsed    hexutil.Uint64 `json:"regularGasUsed,omitempty"`
+		StateGasUsed      hexutil.Uint64 `json:"stateGasUsed,omitempty"`
+		GasRefund         hexutil.Uint64 `json:"gasRefund,omitempty"`
 		EffectiveGasPrice *hexutil.Big   `json:"effectiveGasPrice"`
 		BlobGasUsed       hexutil.Uint64 `json:"blobGasUsed,omitempty"`
 		BlobGasPrice      *hexutil.Big   `json:"blobGasPrice,omitempty"`
@@ -42,6 +45,9 @@ func (r Receipt) MarshalJSON() ([]byte, error) {
 	enc.TxHash = r.TxHash
 	enc.ContractAddress = r.ContractAddress
 	enc.GasUsed = hexutil.Uint64(r.GasUsed)
+	enc.RegularGasUsed = hexutil.Uint64(r.RegularGasUsed)
+	enc.StateGasUsed = hexutil.Uint64(r.StateGasUsed)
+	enc.GasRefund = hexutil.Uint64(r.GasRefund)
 	enc.EffectiveGasPrice = (*hexutil.Big)(r.EffectiveGasPrice)
 	enc.BlobGasUsed = hexutil.Uint64(r.BlobGasUsed)
 	enc.BlobGasPrice = (*hexutil.Big)(r.BlobGasPrice)
@@ -63,6 +69,9 @@ func (r *Receipt) UnmarshalJSON(input []byte) error {
 		TxHash            *common.Hash    `json:"transactionHash" gencodec:"required"`
 		ContractAddress   *common.Address `json:"contractAddress"`
 		GasUsed           *hexutil.Uint64 `json:"gasUsed" gencodec:"required"`
+		RegularGasUsed    *hexutil.Uint64 `json:"regularGasUsed,omitempty"`
+		StateGasUsed      *hexutil.Uint64 `json:"stateGasUsed,omitempty"`
+		GasRefund         *hexutil.Uint64 `json:"gasRefund,omitempty"`
 		EffectiveGasPrice *hexutil.Big    `json:"effectiveGasPrice"`
 		BlobGasUsed       *hexutil.Uint64 `json:"blobGasUsed,omitempty"`
 		BlobGasPrice      *hexutil.Big    `json:"blobGasPrice,omitempty"`
@@ -106,6 +115,15 @@ func (r *Receipt) UnmarshalJSON(input []byte) error {
 		return errors.New("missing required field 'gasUsed' for Receipt")
 	}
 	r.GasUsed = uint64(*dec.GasUsed)
+	if dec.RegularGasUsed != nil {
+		r.RegularGasUsed = uint64(*dec.RegularGasUsed)
+	}
+	if dec.StateGasUsed != nil {
+		r.StateGasUsed = uint64(*dec.StateGasUsed)
+	}
+	if dec.GasRefund != nil {
+		r.GasRefund = uint64(*dec.GasRefund)
+	}
 	if dec.EffectiveGasPrice != nil {
 		r.EffectiveGasPrice = (*big.Int)(dec.EffectiveGasPrice)
 	}

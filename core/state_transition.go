@@ -36,6 +36,9 @@ import (
 type ExecutionResult struct {
 	UsedGas    uint64 // Total used gas, refunded gas is deducted
 	MaxUsedGas uint64 // Maximum gas consumed during execution, excluding gas refunds.
+	RegularGas uint64 // EIP-8037 gross regular-gas block contribution (pre-refund)
+	StateGas   uint64 // EIP-8037 gross state-gas block contribution
+	GasRefund  uint64 // EIP-3529 refund (reduces receipt, not block gas)
 	Err        error  // Any error encountered during the execution(listed in core/vm/errors.go)
 	ReturnData []byte // Returned data from evm(function result or data supplied with revert opcode)
 }
@@ -395,6 +398,9 @@ func ApplyMessage(evm *vm.EVM, msg *Message, gp *GasPool) (*ExecutionResult, err
 //  5. Run Script section
 //  6. Derive new state root
 type stateTransition struct {
+	txRegularGas uint64 // EIP-8037 2D split captured in settleGas
+	txStateGas   uint64
+	txRefund     uint64
 	gp            *GasPool
 	msg           *Message
 	gasRemaining  vm.GasBudget
@@ -843,6 +849,9 @@ func (st *stateTransition) execute() (*ExecutionResult, error) {
 	return &ExecutionResult{
 		UsedGas:    gasUsed,
 		MaxUsedGas: peakUsed,
+		RegularGas: st.txRegularGas,
+		StateGas:   st.txStateGas,
+		GasRefund:  st.txRefund,
 		Err:        vmerr,
 		ReturnData: ret,
 	}, nil
@@ -929,6 +938,7 @@ func (st *stateTransition) settleGas(rules params.Rules, floorDataGas uint64) (g
 
 	// EIP-3529: tx_gas_refund = min(tx_gas_used_before_refund/5, refund_counter).
 	refund := st.calcRefund(gasUsedBeforeRefund)
+	st.txRegularGas, st.txStateGas, st.txRefund = txRegularGas, txStateGas, refund
 	if st.evm.Config.Tracer.HasGasHook() {
 		st.evm.Config.Tracer.EmitGasChange(tracing.Gas{Regular: gasLeft}, tracing.Gas{Regular: gasLeft + refund}, tracing.GasChangeTxRefunds)
 	}

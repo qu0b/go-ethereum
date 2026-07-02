@@ -53,6 +53,9 @@ type callFrame struct {
 	From         common.Address  `json:"from"`
 	Gas          uint64          `json:"gas"`
 	GasUsed      uint64          `json:"gasUsed"`
+	RegularGasUsed uint64         `json:"regularGasUsed,omitempty"`
+	StateGasUsed   uint64         `json:"stateGasUsed,omitempty"`
+	GasRefund      uint64         `json:"gasRefund,omitempty"`
 	To           *common.Address `json:"to,omitempty" rlp:"optional"`
 	Input        []byte          `json:"input" rlp:"optional"`
 	Output       []byte          `json:"output,omitempty" rlp:"optional"`
@@ -106,6 +109,9 @@ type callFrameMarshaling struct {
 	TypeString string `json:"type"`
 	Gas        hexutil.Uint64
 	GasUsed    hexutil.Uint64
+	RegularGasUsed hexutil.Uint64
+	StateGasUsed   hexutil.Uint64
+	GasRefund      hexutil.Uint64
 	Value      *hexutil.Big
 	Input      hexutil.Bytes
 	Output     hexutil.Bytes
@@ -227,6 +233,9 @@ func (t *callTracer) OnTxEnd(receipt *types.Receipt, err error) {
 	}
 	if receipt != nil {
 		t.callstack[0].GasUsed = receipt.GasUsed
+		t.callstack[0].RegularGasUsed = receipt.RegularGasUsed
+		t.callstack[0].StateGasUsed = receipt.StateGasUsed
+		t.callstack[0].GasRefund = receipt.GasRefund
 	}
 	if t.config.WithLog {
 		// Logs are not emitted when the call fails
