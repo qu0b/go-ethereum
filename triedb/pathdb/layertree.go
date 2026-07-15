@@ -17,6 +17,7 @@
 package pathdb
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"sync"
@@ -310,6 +311,27 @@ func (tree *layerTree) bottom() *diskLayer {
 	defer tree.lock.RUnlock()
 
 	return tree.base
+}
+
+// front returns the layer with the highest state id, namely the most recently
+// updated layer. The disk layer is returned if no diff layers exist. Tips of
+// distinct branches at the same height share a state id; the tie is broken by
+// root hash so the result is deterministic.
+func (tree *layerTree) front() layer {
+	tree.lock.RLock()
+	defer tree.lock.RUnlock()
+
+	var head layer
+	for _, l := range tree.layers {
+		if head == nil || l.stateID() > head.stateID() {
+			head = l
+			continue
+		}
+		if l.stateID() == head.stateID() && bytes.Compare(l.rootHash().Bytes(), head.rootHash().Bytes()) < 0 {
+			head = l
+		}
+	}
+	return head
 }
 
 // lookupAccount returns the layer that is guaranteed to contain the account data

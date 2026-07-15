@@ -322,7 +322,18 @@ func (db *Database) Journal(root common.Hash) error {
 	// Retrieve the head layer to journal from.
 	l := db.tree.get(root)
 	if l == nil {
-		return fmt.Errorf("triedb layer [%#x] missing", root)
+		// The layer for the requested root is no longer in the tree. This can
+		// happen if the root belongs to a stale branch which was evicted when
+		// the layer cap crossed its fork point, e.g. after a long run of
+		// chain-extending payloads that were never made canonical via the
+		// forkchoice update. Journal from the most recent layer instead of
+		// aborting: aborting would discard every unflushed in-memory state,
+		// including the disk layer buffer, potentially rewinding the node
+		// far below the requested root on restart.
+		if l = db.tree.front(); l == nil {
+			return fmt.Errorf("triedb layer [%#x] missing", root)
+		}
+		log.Error("Journal root missing, falling back to most recent layer", "requested", root, "fallback", l.rootHash(), "id", l.stateID())
 	}
 	disk := db.tree.bottom()
 	if l, ok := l.(*diffLayer); ok {

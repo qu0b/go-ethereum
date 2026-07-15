@@ -1382,7 +1382,7 @@ func (bc *BlockChain) Stop() {
 	if bc.triedb.Scheme() == rawdb.PathScheme {
 		// Ensure that the in-memory trie nodes are journaled to disk properly.
 		if err := bc.triedb.Journal(bc.CurrentBlock().Root); err != nil {
-			log.Info("Failed to journal in-memory trie nodes", "err", err)
+			log.Error("Failed to journal in-memory trie nodes", "err", err)
 		}
 	} else {
 		// Ensure the state of a recent block is also stored to disk before exiting.

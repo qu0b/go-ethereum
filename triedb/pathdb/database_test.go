@@ -891,6 +891,75 @@ func testJournal(t *testing.T, journalDir string) {
 	}
 }
 
+// Tests that journaling at shutdown still persists the in-memory states even
+// if the requested root has been evicted from the layer tree. The scenario:
+// the chain head is only moved by forkchoice updates while payload insertion
+// keeps extending a competing branch; once that branch grows maxDiffLayers
+// past the fork point, the cap flattens the fork point into the disk layer
+// and drops the stale branch holding the head root. Journaling keyed to the
+// stale head must fall back to the surviving branch rather than abort and
+// discard all unflushed state.
+func TestJournalMissingRootFallback(t *testing.T) {
+	// Redefine the diff layer depth allowance for faster testing.
+	maxDiffLayers = 4
+	defer func() {
+		maxDiffLayers = 128
+	}()
+
+	journalDir := filepath.Join(t.TempDir(), strconv.Itoa(rand.Intn(10000)))
+	tester := newTester(t, &testerConfig{layers: 6, journalDir: journalDir})
+	defer tester.release()
+
+	var (
+		head   = tester.lastHash()                 // stale branch tip, held as chain head
+		parent = tester.roots[len(tester.roots)-2] // fork point
+		tip    common.Hash                         // competing branch tip
+	)
+	// Extend a competing branch from the fork point until the head layer is
+	// evicted by the layer cap. Each fork block inserts one fresh account on
+	// top of its parent's trie.
+	for i := 0; tester.db.tree.get(head) != nil; i++ {
+		if i > 2*maxDiffLayers {
+			t.Fatal("head layer was never evicted from the layer tree")
+		}
+		addr := testrand.Address()
+		accounts := map[common.Hash][]byte{
+			crypto.Keccak256Hash(addr.Bytes()): types.SlimAccountRLP(generateAccount(types.EmptyRootHash)),
+		}
+		root, set := updateTrie(tester.db, parent, common.Hash{}, parent, accounts)
+		nodes := trienode.NewMergedNodeSet()
+		if err := nodes.Merge(set); err != nil {
+			t.Fatalf("Failed to merge node set, err: %v", err)
+		}
+		states := NewStateSetWithOrigin(accounts, nil, map[common.Address][]byte{addr: nil}, nil, true)
+		if err := tester.db.Update(root, parent, uint64(len(tester.roots)+i), nodes, states); err != nil {
+			t.Fatalf("Failed to update state changes, err: %v", err)
+		}
+		parent, tip = root, root
+	}
+	// Journaling keyed to the evicted head must succeed via the fallback.
+	if err := tester.db.Journal(head); err != nil {
+		t.Fatalf("Failed to journal with evicted root, err: %v", err)
+	}
+	tester.db.Close()
+	tester.db = New(tester.db.diskdb, tester.db.config, false)
+
+	// The competing branch must survive the restart in full.
+	if tester.db.tree.get(tip) == nil {
+		t.Fatal("Surviving branch tip is missing after journal reload")
+	}
+	if _, err := trie.New(trie.StateTrieID(tip), tester.db); err != nil {
+		t.Fatalf("Surviving branch tip state is unreadable, err: %v", err)
+	}
+	// The stale head was evicted before journaling and must stay gone.
+	if tester.db.tree.get(head) != nil {
+		t.Fatal("Stale head layer unexpectedly present after reload")
+	}
+	if _, err := trie.New(trie.StateTrieID(head), tester.db); err == nil {
+		t.Fatal("Stale head state should not be readable after reload")
+	}
+}
+
 func TestCorruptedJournal(t *testing.T) {
 	testCorruptedJournal(t, "", func(db ethdb.Database) {
 		// Mutate the journal in disk, it should be regarded as invalid
