@@ -193,6 +193,12 @@ func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.StateD
 		enc := res.Bal.ToEncodingObj()
 		local, remote := enc.Hash(), *block.Header().BlockAccessListHash
 		if local != remote {
+			// The two hashes alone say the lists differ but not how, which leaves
+			// operators re-deriving the whole BAL by hand. Name the first entries
+			// that disagree when the block carried its access list.
+			if attached := block.AccessList(); attached != nil {
+				return fmt.Errorf("access list hash mismatch, local: %x, remote: %x: %s", local, remote, enc.Diff(*attached))
+			}
 			return fmt.Errorf("access list hash mismatch, local: %x, remote: %x", local, remote)
 		}
 		if err := enc.Validate(block.GasLimit(), len(block.Transactions())); err != nil {
