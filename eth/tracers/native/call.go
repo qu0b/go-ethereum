@@ -67,9 +67,9 @@ type callFrame struct {
 
 	// EIP-8037 settlement of the transaction, set on the top-level frame from
 	// Amsterdam on. Not part of the RLP encoding.
-	ExecutionGasUsed *uint64 `json:"executionGasUsed,omitempty" rlp:"-"`
-	StateGasUsed     *uint64 `json:"stateGasUsed,omitempty" rlp:"-"`
-	GasRefund        *uint64 `json:"gasRefund,omitempty" rlp:"-"`
+	RegularGasUsed *uint64 `json:"regularGasUsed,omitempty" rlp:"-"`
+	StateGasUsed   *uint64 `json:"stateGasUsed,omitempty" rlp:"-"`
+	GasRefund      *uint64 `json:"gasRefund,omitempty" rlp:"-"`
 }
 
 func (f callFrame) TypeString() string {
@@ -109,15 +109,15 @@ func (f *callFrame) processOutput(output []byte, err error, reverted bool) {
 }
 
 type callFrameMarshaling struct {
-	TypeString       string `json:"type"`
-	Gas              hexutil.Uint64
-	GasUsed          hexutil.Uint64
-	ExecutionGasUsed *hexutil.Uint64
-	StateGasUsed     *hexutil.Uint64
-	GasRefund        *hexutil.Uint64
-	Value            *hexutil.Big
-	Input            hexutil.Bytes
-	Output           hexutil.Bytes
+	TypeString     string `json:"type"`
+	Gas            hexutil.Uint64
+	GasUsed        hexutil.Uint64
+	RegularGasUsed *hexutil.Uint64
+	StateGasUsed   *hexutil.Uint64
+	GasRefund      *hexutil.Uint64
+	Value          *hexutil.Big
+	Input          hexutil.Bytes
+	Output         hexutil.Bytes
 }
 
 type callTracer struct {
@@ -238,7 +238,7 @@ func (t *callTracer) OnTxEnd(receipt *types.Receipt, usage *tracing.TxGasUsage, 
 		t.callstack[0].GasUsed = receipt.GasUsed
 	}
 	if usage != nil {
-		t.callstack[0].ExecutionGasUsed = &usage.Block.Execution
+		t.callstack[0].RegularGasUsed = &usage.Block.Execution
 		t.callstack[0].StateGasUsed = &usage.Block.State
 		t.callstack[0].GasRefund = &usage.Refund
 	}

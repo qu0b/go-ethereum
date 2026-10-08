@@ -623,7 +623,7 @@ func TestTraceTransactionGasDimensionsAmsterdam(t *testing.T) {
 	api := NewAPI(backend)
 
 	for i, want := range [][4]uint64{
-		// gas, executionGasUsed, stateGasUsed, gasRefund
+		// gas, regularGasUsed, stateGasUsed, gasRefund
 		{204600, 21000, 183600, 0},
 		{205624, 25096, 183600, 0},
 	} {
@@ -635,10 +635,10 @@ func TestTraceTransactionGasDimensionsAmsterdam(t *testing.T) {
 		if err := json.Unmarshal(res.(json.RawMessage), &have); err != nil {
 			t.Fatalf("tx %d: failed to unmarshal result: %v", i, err)
 		}
-		if have.ExecutionGasUsed == nil || have.StateGasUsed == nil || have.GasRefund == nil {
+		if have.RegularGasUsed == nil || have.StateGasUsed == nil || have.GasRefund == nil {
 			t.Fatalf("tx %d: missing gas dimensions: %s", i, res)
 		}
-		if got := [4]uint64{have.Gas, *have.ExecutionGasUsed, *have.StateGasUsed, *have.GasRefund}; got != want {
+		if got := [4]uint64{have.Gas, *have.RegularGasUsed, *have.StateGasUsed, *have.GasRefund}; got != want {
 			t.Errorf("tx %d: gas mismatch: have %v, want %v", i, got, want)
 		}
 	}

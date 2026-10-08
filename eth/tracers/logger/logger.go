@@ -388,7 +388,7 @@ func (l *StructLogger) GetResult() (json.RawMessage, error) {
 		StructLogs:  l.logs,
 	}
 	if l.usage != nil {
-		res.ExecutionGasUsed = &l.usage.Block.Execution
+		res.RegularGasUsed = &l.usage.Block.Execution
 		res.StateGasUsed = &l.usage.Block.State
 		res.GasRefund = &l.usage.Refund
 	}
@@ -565,7 +565,7 @@ type ExecutionResult struct {
 	StructLogs  []json.RawMessage `json:"structLogs"`
 
 	// EIP-8037 settlement of the transaction, present from Amsterdam on.
-	ExecutionGasUsed *uint64 `json:"executionGasUsed,omitempty"`
-	StateGasUsed     *uint64 `json:"stateGasUsed,omitempty"`
-	GasRefund        *uint64 `json:"gasRefund,omitempty"`
+	RegularGasUsed *uint64 `json:"regularGasUsed,omitempty"`
+	StateGasUsed   *uint64 `json:"stateGasUsed,omitempty"`
+	GasRefund      *uint64 `json:"gasRefund,omitempty"`
 }
